@@ -95,15 +95,15 @@
         '';
       };
 
-      versa-haskell = pkgs.mkShell {
-        name = "versa-haskell";
+      versa-hs = pkgs.mkShell {
+        name = "versa-hs";
         buildInputs = haskellBuildInputs;
         # Make external Nix c libraries like zlib known to GHC, like
         # pkgs.haskell.lib.buildStackProject does
         # https://github.com/NixOS/nixpkgs/blob/d64780ea0e22b5f61cd6012a456869c702a72f20/pkgs/development/haskell-modules/generic-stack-builder.nix#L38
         LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath haskellBuildInputs;
         shellHook = ''
-          echo "Welcome to versa-haskell, happy hacking 🪲" 
+          echo "Welcome to versa-hs, happy hacking 🪲" 
         '';
       };
 
