@@ -78,6 +78,7 @@
         buildInputs = [
           rust-toolchain
         ] ++ (with pkgs; [
+          taplo # toml formatter
           pkg-config
           clang
           rocksdb
