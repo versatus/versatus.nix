@@ -18,7 +18,7 @@
   rustc = rust-toolchain;
 }).buildRustPackage
 {
-  pname = "protocol-dev";
+  pname = "";
   version = "0.0.0";
   src = versatus;
   cargoLock.lockFile = versatus + "/Cargo.lock";

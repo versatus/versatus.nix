@@ -6,8 +6,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    fenix-rust = {
-      url = "github:nix-community/fenix";
+    crane = {
+      url = "github:ipetkov/crane";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     versatus = {
@@ -32,11 +32,7 @@
     #
     # @Input: `nixpkgs`
     # @Output: Attribute set of dev-shells
-    mkDevShells = pkgs: let
-      rust-toolchain = pkgs.fenix.fromToolchainFile {
-        file = inputs.versatus + "/rust-toolchain.toml";
-        sha256 = "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
-      };
+    mkDevShells = pkgs: system: let
       # Wrap Stack to work with our Nix integration. We don't want to modify
       # stack.yaml so non-Nix users don't notice anything.
       # --no-nix:         We don't want Stack's way of integrating Nix.
@@ -74,27 +70,10 @@
       ]);
     in rec {
       protocol-dev = pkgs.mkShell {
-        name = "protocol-dev";
-        buildInputs = [
-          rust-toolchain
-        ] ++ (with pkgs; [
-          taplo # toml formatter
-          pkg-config
-          clang
-          rocksdb
-          openssl.dev
-          libiconv
-        ] ++ lib.optionals stdenv.isDarwin [
-          darwin.apple_sdk.frameworks.Security
-          darwin.apple_sdk.frameworks.SystemConfiguration
-        ]);
-        LIBCLANG_PATH="${pkgs.libclang.lib}/lib";
-        ROCKSDB_LIB_DIR="${pkgs.rocksdb}/lib";
-        shellHook = ''
-          echo "Welcome to versatus, happy hacking 🦀"
-        '';
+        inputsFrom = [
+          inputs.self.outputs.packages.${system}.versa-pkgs
+        ];
       };
-
       versa-hs = pkgs.mkShell {
         name = "versa-hs";
         buildInputs = haskellBuildInputs;
@@ -107,7 +86,7 @@
         '';
       };
 
-      default = protocol-dev;
+      default = versa-hs;
     };
 
     # @Function
@@ -117,11 +96,17 @@
     mkOutput = system: let
       pkgs = import inputs.nixpkgs {
         inherit system;
-        overlays = [ inputs.fenix-rust.overlays.default ];
+        # overlays = [ inputs.fenix-rust.overlays.default ];
       };
+      craneLib = inputs.crane.lib.${system};
     in {
-      # TODO: add mkPackages as part of output
-      # versa-pkgs = mkPackages pkgs;
+      packages = {
+        # TODO: add mkPackages as part of output
+        versa-pkgs = pkgs.callPackage ./crane-pkg.nix {
+          inherit craneLib;
+          inherit (inputs) versatus;
+        };
+      };
 
       # TODO: finalize cross platform rust-toolchain
       # fenix = {
@@ -133,7 +118,7 @@
       #     };
       #   };
       # };
-      devShells = mkDevShells pkgs;
+      devShells = mkDevShells pkgs system;
       formatter = pkgs.alejandra;
     };
 
