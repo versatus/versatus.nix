@@ -1,129 +1,156 @@
 {
-  description =
-    "A Nix flake for the Versatus labs ecosystem that builds Versatus binaries and provides
-    development environments for building on Versatus repositories for supported systems.";
+  description = "Build a cargo project";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+
     crane = {
       url = "github:ipetkov/crane";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.rust-analyzer-src.follows = "";
+    };
+
+    flake-utils.url = "github:numtide/flake-utils";
+
+    # advisory-db = {
+    #   url = "github:rustsec/advisory-db";
+    #   flake = false;
+    # };
+
     versatus = {
       url = "github:versatus/versatus";
       flake = false;
     };
   };
 
-  outputs = inputs: let
-    # Updates the systems that Versatus binaries support
-    # and dev-shells can be built for
-    flake-utils.supportedSystem = [
-      "x86_64-linux"
-      "x86_64-darwin"
-      "aarch64-linux"
-      "aarch64-darwin"
-    ];
-    flake-utils.eachSupportedSystem =
-      inputs.flake-utils.lib.eachSystem flake-utils.supportedSystem;
+  outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
 
-    # @Function
-    #
-    # @Input: `nixpkgs`
-    # @Output: Attribute set of dev-shells
-    mkDevShells = pkgs: system: let
-      # Wrap Stack to work with our Nix integration. We don't want to modify
-      # stack.yaml so non-Nix users don't notice anything.
-      # --no-nix:         We don't want Stack's way of integrating Nix.
-      # --system-ghc:     Use the existing GHC on PATH (will come from this Nix file)
-      # --no-install-ghc: Don't try to install GHC if no matching GHC found on PATH
-      stack-wrapped = pkgs.symlinkJoin {
-        name = "stack"; # will be available as the usual `stack` in terminal
-        paths = [ pkgs.stack ];
-        buildInputs = [ pkgs.makeWrapper ];
-        postBuild = ''
-          wrapProgram $out/bin/stack \
-            --add-flags "\
-              --no-nix \
-              --system-ghc \
-              --no-install-ghc \
-            "
-        '';
-      };
-      # Uses the latest compatible nixpkgs version.
-      # Updating nixpkgs with `nix flake update` may break this.
-      hs-pkgs = pkgs.haskell.packages.ghc963;
-      haskellBuildInputs = [
-        stack-wrapped
-      ] ++ (with hs-pkgs; [
-        ghc
-        ghcid
-        cabal-install
-        ormolu
-        hlint
-        hoogle
-        haskell-language-server
-        implicit-hie
-        retrie
-        zlib
-      ]);
-    in rec {
-      protocol-dev = pkgs.mkShell {
-        inputsFrom = [
-          inputs.self.outputs.packages.${system}.versa-pkgs
-        ];
-      };
-      versa-hs = pkgs.mkShell {
-        name = "versa-hs";
-        buildInputs = haskellBuildInputs;
-        # Make external Nix c libraries like zlib known to GHC, like
-        # pkgs.haskell.lib.buildStackProject does
-        # https://github.com/NixOS/nixpkgs/blob/d64780ea0e22b5f61cd6012a456869c702a72f20/pkgs/development/haskell-modules/generic-stack-builder.nix#L38
-        LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath haskellBuildInputs;
-        shellHook = ''
-          echo "Welcome to versa-hs, happy hacking 🪲" 
-        '';
-      };
+        inherit (pkgs) lib;
 
-      default = versa-hs;
-    };
+        craneLib = crane.lib.${system};
+        src = craneLib.cleanCargoSource (craneLib.path (builtins.toString self.inputs.versatus));
 
-    # @Function
-    #
-    # @Input: `currentSystem` specified by `supportedSystem`
-    # @Output: builds `devShell`s & Versatus packages 
-    mkOutput = system: let
-      pkgs = import inputs.nixpkgs {
-        inherit system;
-        # overlays = [ inputs.fenix-rust.overlays.default ];
-      };
-      craneLib = inputs.crane.lib.${system};
-    in {
-      packages = {
-        # TODO: add mkPackages as part of output
-        versa-pkgs = pkgs.callPackage ./crane-pkg.nix {
-          inherit craneLib;
-          inherit (inputs) versatus;
+        # Common arguments can be set here to avoid repeating them later
+        protocolArgs = {
+          inherit src;
+          strictDeps = true;
+
+          nativeBuildInputs = with pkgs; [
+            # Inputs that must be available at the time of the build
+            pkg-config # necessary for linking OpenSSL
+            clang
+          ];
+
+          buildInputs = with pkgs; [
+            # Add additional build inputs here
+            rocksdb
+            openssl.dev
+          ] ++ lib.optionals stdenv.isDarwin [
+            # Additional darwin specific inputs can be set here
+            libiconv
+            darwin.apple_sdk.frameworks.Security
+            darwin.apple_sdk.frameworks.SystemConfiguration
+          ];
+
+          # Additional environment variables can be set directly
+          # MY_CUSTOM_VAR = "some value";
+          LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
+          ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
         };
-      };
 
-      # TODO: finalize cross platform rust-toolchain
-      # fenix = {
-      #   default = pkgs.callPackage ./rust-toolchain.nix {
-      #     versatus = inputs.versatus;
-      #     rust-toolchain = pkgs.fenix.fromToolchainFile {
-      #       file = inputs.versatus + "/rust-toolchain.toml";
-      #       sha256 = "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
-      #     };
-      #   };
-      # };
-      devShells = mkDevShells pkgs system;
-      formatter = pkgs.alejandra;
-    };
+        craneLibLLvmTools = craneLib.overrideToolchain
+          (fenix.packages.${system}.fromToolchainFile {
+            file = self.inputs.versatus + "/rust-toolchain.toml";
+            sha256 = "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
+          });
+        # Build *just* the cargo dependencies, so we can reuse
+        # all of that work (e.g. via cachix) when running in CI
+        cargoArtifacts = craneLib.buildDepsOnly protocolArgs;
 
-    # The output for each system.
-    systemOutputs = flake-utils.eachSupportedSystem mkOutput;
-  in
-    systemOutputs // { inherit flake-utils; };
+        # Build the actual crate itself, reusing the dependency
+        # artifacts from above.
+        versatus-protocol = craneLib.buildPackage (protocolArgs // {
+          doCheck = false;
+          inherit cargoArtifacts;
+        });
+      in
+      {
+        checks = {
+          # Build the crate as part of `nix flake check` for convenience
+          versatus-protocol = versatus-protocol;
+
+          # Run clippy (and deny all warnings) on the crate source,
+          # again, resuing the dependency artifacts from above.
+          #
+          # Note that this is done as a separate derivation so that
+          # we can block the CI if there are issues here, but not
+          # prevent downstream consumers from building our crate by itself.
+          my-crate-clippy = craneLib.cargoClippy (protocolArgs // {
+            inherit cargoArtifacts;
+            cargoClippyExtraArgs = "--all-targets -- --deny warnings";
+          });
+
+          my-crate-doc = craneLib.cargoDoc (protocolArgs // {
+            inherit cargoArtifacts;
+          });
+
+          # Check formatting
+          my-crate-fmt = craneLib.cargoFmt {
+            inherit src;
+          };
+
+          # Audit dependencies
+          # my-crate-audit = craneLib.cargoAudit {
+          #   inherit src advisory-db;
+          # };
+
+          # # Audit licenses
+          # my-crate-deny = craneLib.cargoDeny {
+          #   inherit src;
+          # };
+
+          # Run tests with cargo-nextest
+          # Consider setting `doCheck = false` on `my-crate` if you do not want
+          # the tests to run twice
+          # my-crate-nextest = craneLib.cargoNextest (commonArgs // {
+          #   inherit cargoArtifacts;
+          #   partitions = 1;
+          #   partitionType = "count";
+          # });
+        };
+
+        packages = rec {
+          versatus-protocol = versatus-protocol;
+          default = versatus-protocol;
+        } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+          my-crate-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (protocolArgs // {
+            inherit cargoArtifacts;
+          });
+        };
+
+        apps.default = flake-utils.lib.mkApp {
+          drv = versatus-protocol;
+        };
+
+        devShells.default = craneLib.devShell {
+          # Inherit inputs from checks.
+          checks = self.checks.${system};
+
+          # Additional dev-shell environment variables can be set directly
+          # MY_CUSTOM_DEVELOPMENT_VAR = "something else";
+
+          # Extra inputs can be added here; cargo and rustc are provided by default.
+          packages = [
+            # pkgs.ripgrep
+          ];
+        };
+      });
 }
