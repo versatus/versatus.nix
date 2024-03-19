@@ -35,15 +35,12 @@
 
         inherit (pkgs) lib;
 
+        versatus = self.inputs.versatus;
         craneLib = crane.lib.${system};
-        src = craneLib.cleanCargoSource (craneLib.path (builtins.toString self.inputs.versatus));
+        src = craneLib.cleanCargoSource (craneLib.path (builtins.toString versatus));
 
-        rustToolchain =
-          (fenix.packages.${system}.fromToolchainFile {
-            file = self.inputs.versatus + "/rust-toolchain.toml";
-            sha256 = "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
-          });
-        haskellToolchain = pkgs.callPackage ./haskell.nix pkgs;
+        rustToolchain = pkgs.callPackage ./dev/rust-toolchain.nix { inherit fenix; inherit versatus; };
+        haskellToolchain = pkgs.callPackage ./dev/haskell-toolchain.nix pkgs;
 
         protocolArgs = {
           inherit src;
@@ -150,7 +147,7 @@
             name = "versa-hs";
             buildInputs = haskellToolchain;
             # Make external Nix c libraries like zlib known to GHC, like
-            # pkgs.haskell.lib.buildStackProject does
+            # `pkgs.haskell.lib.buildStackProject` does
             # https://github.com/NixOS/nixpkgs/blob/d64780ea0e22b5f61cd6012a456869c702a72f20/pkgs/development/haskell-modules/generic-stack-builder.nix#L38
             LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath haskellToolchain;
             shellHook = ''
@@ -166,7 +163,8 @@
           protocol-dev = craneLib.devShell {
             # Inherit inputs from checks.
             checks = self.checks.${system};
-
+            # Explicit rebinding since the environment args aren't
+            # inherited from `checks` like the packages are.
             LIBCLANG_PATH = protocolArgs.LIBCLANG_PATH;
             ROCKSDB_LIB_DIR = protocolArgs.ROCKSDB_LIB_DIR;
           };
