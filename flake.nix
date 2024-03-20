@@ -36,22 +36,26 @@
   };
 
   outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
+    # TODO: Define supported systems
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-
         inherit (pkgs) lib;
 
-        versatus = self.inputs.versatus;
-        lasr = self.inputs.lasr;
-        craneLib = crane.lib.${system};
-        versaSrc = craneLib.cleanCargoSource (craneLib.path (builtins.toString versatus));
-        lasrSrc = craneLib.cleanCargoSource (craneLib.path (builtins.toString lasr));
-
+        # Language toolchains
         rustToolchain = pkgs.callPackage ./dev/rust-toolchain.nix { inherit fenix; inherit versatus; };
         haskellToolchain = pkgs.callPackage ./dev/haskell-toolchain.nix pkgs;
 
-        # Dependency packages to build the entire protocol workspace
+        # Overrides the default crane rust-toolchain with fenix.
+        craneLib = crane.lib.${system}.overrideToolchain rustToolchain.fenix-pkgs;
+
+        # Cargo source files
+        versatus = self.inputs.versatus;
+        lasr = self.inputs.lasr;
+        versaSrc = craneLib.cleanCargoSource (craneLib.path (builtins.toString versatus));
+        lasrSrc = craneLib.cleanCargoSource (craneLib.path (builtins.toString lasr));
+
+        # Dependency packages of each binary
         protocolArgs = {
           src = versaSrc;
           strictDeps = true;
@@ -70,15 +74,11 @@
           LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
           ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
         };
-
         lasrArgs = {
           src = lasrSrc;
           strictDeps = true;
           buildInputs = [ rustToolchain.darwin-pkgs ];
         };
-
-        # Overrides the default crane rust-toolchain with fenix.
-        craneLibLlvmTools = craneLib.overrideToolchain rustToolchain.fenix-pkgs;
 
         # Build *just* the cargo dependencies, so we can reuse
         # all of that work (e.g. via cachix) when running in CI
@@ -99,6 +99,8 @@
         });
       in
       {
+        # TODO: see if these checks can be rolled back into `self.checks`
+        # then inherit the relevant packages into the `devShell`s
         versaNodeChecks = {
           # Build the crates as part of `nix flake check` for convenience
           versaNodeBuild = versaNodeDrv;
@@ -142,7 +144,6 @@
           #   partitionType = "count";
           # });
         };
-
         lasrNodeChecks = {
           # Build the crates as part of `nix flake check` for convenience
           lasrNodeBuild = lasrNodeDrv;
@@ -192,7 +193,7 @@
           lasrNodeBin = lasrNodeDrv;
           default = versaNodeBin;
         } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-          protocol-llvm-coverage = craneLibLlvmTools.cargoLlvmCov (protocolArgs // {
+          protocol-llvm-coverage = craneLib.cargoLlvmCov (protocolArgs // {
             cargoArtifacts = protocolDeps;
           });
         };
@@ -208,6 +209,26 @@
         };
 
         devShells = rec {
+          default = protocol-dev;
+          # Developer environments for Versatus repos
+          protocol-dev = craneLib.devShell {
+            # Inherit inputs from checks.
+            checks = self.versaNodeChecks.${system};
+            # Explicit rebinding since the environment args aren't
+            # inherited from `checks` like the packages are.
+            LIBCLANG_PATH = protocolArgs.LIBCLANG_PATH;
+            ROCKSDB_LIB_DIR = protocolArgs.ROCKSDB_LIB_DIR;
+          };
+          lasr-dev = craneLib.devShell { checks = self.lasrNodeChecks.${system}; };
+
+          # Language developer environments for building smart contracts
+          # with Versatus language SDKs
+          versa-rs = pkgs.mkShell {
+            buildInputs = rustToolchain.complete;
+            shellHook = ''
+              echo "Welcome to versatus, happy hacking 🦀"
+            '';
+          };
           versa-hs = pkgs.mkShell {
             name = "versa-hs";
             buildInputs = haskellToolchain;
@@ -219,22 +240,6 @@
               echo "Welcome to versa-hs, happy hacking 🪲" 
             '';
           };
-          versa-rs = pkgs.mkShell {
-            buildInputs = rustToolchain.complete;
-            shellHook = ''
-              echo "Welcome to versatus, happy hacking 🦀"
-            '';
-          };
-          protocol-dev = craneLib.devShell {
-            # Inherit inputs from checks.
-            checks = self.versaNodeChecks.${system};
-            # Explicit rebinding since the environment args aren't
-            # inherited from `checks` like the packages are.
-            LIBCLANG_PATH = protocolArgs.LIBCLANG_PATH;
-            ROCKSDB_LIB_DIR = protocolArgs.ROCKSDB_LIB_DIR;
-          };
-          lasr-dev = craneLib.devShell { checks = self.lasrNodeChecks.${system}; };
-          default = protocol-dev;
         };
       });
 }
