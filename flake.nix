@@ -56,19 +56,14 @@
             # Add additional build inputs here
             rocksdb
             openssl.dev
-          ] ++ lib.optionals stdenv.isDarwin [
-            # Additional darwin specific inputs
-            libiconv
-            darwin.apple_sdk.frameworks.Security
-            darwin.apple_sdk.frameworks.SystemConfiguration
-          ];
-
+          ] ++ [ rustToolchain.darwin-pkgs ];
+          
           LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
           ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
         };
 
         # Overrides the default crane rust-toolchain with fenix.
-        craneLibLLvmTools = craneLib.overrideToolchain rustToolchain;
+        craneLibLlvmTools = craneLib.overrideToolchain rustToolchain.fenix-pkgs;
 
         # Build *just* the cargo dependencies, so we can reuse
         # all of that work (e.g. via cachix) when running in CI
@@ -133,7 +128,7 @@
           versa-pkgs = versatusDrv;
           default = versa-pkgs;
         } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-          my-crate-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (protocolArgs // {
+          protocol-llvm-coverage = craneLibLlvmTools.cargoLlvmCov (protocolArgs // {
             inherit cargoArtifacts;
           });
         };
@@ -155,12 +150,7 @@
             '';
           };
           versa-rs = pkgs.mkShell {
-            buildInputs = [ rustToolchain ] ++ (with pkgs; lib.optionals stdenv.isDarwin [
-            # Additional darwin specific inputs
-            libiconv
-            darwin.apple_sdk.frameworks.Security
-            darwin.apple_sdk.frameworks.SystemConfiguration
-          ]);
+            buildInputs = rustToolchain.complete;
             shellHook = ''
               echo "Welcome to versatus, happy hacking 🦀"
             '';
