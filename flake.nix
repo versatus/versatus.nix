@@ -28,6 +28,11 @@
       url = "github:versatus/versatus";
       flake = false;
     };
+
+    lasr = {
+      url = "github:versatus/lasr";
+      flake = false;
+    };
   };
 
   outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
@@ -38,24 +43,26 @@
         inherit (pkgs) lib;
 
         versatus = self.inputs.versatus;
+        lasr = self.inputs.lasr;
         craneLib = crane.lib.${system};
-        src = craneLib.cleanCargoSource (craneLib.path (builtins.toString versatus));
+        versaSrc = craneLib.cleanCargoSource (craneLib.path (builtins.toString versatus));
+        lasrSrc = craneLib.cleanCargoSource (craneLib.path (builtins.toString lasr));
 
         rustToolchain = pkgs.callPackage ./dev/rust-toolchain.nix { inherit fenix; inherit versatus; };
         haskellToolchain = pkgs.callPackage ./dev/haskell-toolchain.nix pkgs;
 
+        # Dependency packages to build the entire protocol workspace
         protocolArgs = {
-          inherit src;
+          src = versaSrc;
           strictDeps = true;
 
+          # Inputs that must be available at the time of the build
           nativeBuildInputs = with pkgs; [
-            # Inputs that must be available at the time of the build
             pkg-config # necessary for linking OpenSSL
             clang
           ];
 
           buildInputs = with pkgs; [
-            # Add additional build inputs here
             rocksdb
             openssl.dev
           ] ++ [ rustToolchain.darwin-pkgs ];
@@ -64,27 +71,37 @@
           ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
         };
 
+        lasrArgs = {
+          src = lasrSrc;
+          strictDeps = true;
+          buildInputs = [ rustToolchain.darwin-pkgs ];
+        };
+
         # Overrides the default crane rust-toolchain with fenix.
         craneLibLlvmTools = craneLib.overrideToolchain rustToolchain.fenix-pkgs;
 
         # Build *just* the cargo dependencies, so we can reuse
         # all of that work (e.g. via cachix) when running in CI
-        cargoArtifacts = craneLib.buildDepsOnly protocolArgs;
+        protocolDeps = craneLib.buildDepsOnly protocolArgs;
+        lasrDeps = craneLib.buildDepsOnly lasrArgs;
 
-        # Build the actual crates itself, reusing the dependency
+        # Build the actual crate itself, reusing the dependency
         # artifacts from above.
-        #
-        # TODO: add args to package build for each bin
-        # right now this just builds the entire workspace
-        versatusDrv = craneLib.buildPackage (protocolArgs // {
+        versaNodeDrv = craneLib.buildPackage (protocolArgs // {
           doCheck = false; # disables `cargo test` during `nix flake check`
-          inherit cargoArtifacts;
+          cargoArtifacts = protocolDeps;
+          cargoExtraArgs = "--locked --bin versa";
+        });
+        lasrNodeDrv = craneLib.buildPackage (lasrArgs // {
+          doCheck = false;
+          cargoArtifacts = lasrDeps;
+          cargoExtraArgs = "--locked --bin lasr_node";
         });
       in
       {
-        checks = {
+        versaNodeChecks = {
           # Build the crates as part of `nix flake check` for convenience
-          versatusProtocolBuild = versatusDrv;
+          versaNodeBuild = versaNodeDrv;
 
           # Run clippy (and deny all warnings) on the crate source,
           # again, resuing the dependency artifacts from above.
@@ -92,18 +109,18 @@
           # Note that this is done as a separate derivation so that
           # we can block the CI if there are issues here, but not
           # prevent downstream consumers from building our crate by itself.
-          versatus-clippy = craneLib.cargoClippy (protocolArgs // {
-            inherit cargoArtifacts;
+          versa-node-clippy = craneLib.cargoClippy (protocolArgs // {
+            cargoArtifacts = protocolDeps;
             cargoClippyExtraArgs = "--all-targets -- --deny warnings";
           });
 
-          versatus-doc = craneLib.cargoDoc (protocolArgs // {
-            inherit cargoArtifacts;
+          versa-node-doc = craneLib.cargoDoc (protocolArgs // {
+            cargoArtifacts = protocolDeps;
           });
 
           # Check formatting
-          versatus-fmt = craneLib.cargoFmt {
-            inherit src;
+          versa-node-fmt = craneLib.cargoFmt {
+            src = versaSrc;
           };
 
           # Audit dependencies
@@ -126,17 +143,68 @@
           # });
         };
 
+        lasrNodeChecks = {
+          # Build the crates as part of `nix flake check` for convenience
+          lasrNodeBuild = lasrNodeDrv;
+
+          # Run clippy (and deny all warnings) on the crate source,
+          # again, resuing the dependency artifacts from above.
+          #
+          # Note that this is done as a separate derivation so that
+          # we can block the CI if there are issues here, but not
+          # prevent downstream consumers from building our crate by itself.
+          # lasr-node-clippy = craneLib.cargoClippy (lasrArgs // {
+          #   cargoArtifacts = lasrDeps;
+          #   cargoClippyExtraArgs = "--all-targets -- --deny warnings";
+          # });
+
+          lasr-node-doc = craneLib.cargoDoc (lasrArgs // {
+            cargoArtifacts = lasrDeps;
+          });
+
+          # Check formatting
+          # lasr-node-fmt = craneLib.cargoFmt {
+          #   src = lasrSrc;
+          # };
+
+          # Audit dependencies
+          # my-crate-audit = craneLib.cargoAudit {
+          #   inherit src advisory-db;
+          # };
+
+          # # Audit licenses
+          # my-crate-deny = craneLib.cargoDeny {
+          #   inherit src;
+          # };
+
+          # Run tests with cargo-nextest
+          # Consider setting `doCheck = false` on `my-crate` if you do not want
+          # the tests to run twice
+          # my-crate-nextest = craneLib.cargoNextest (commonArgs // {
+          #   inherit cargoArtifacts;
+          #   partitions = 1;
+          #   partitionType = "count";
+          # });
+        };
+
         packages = rec {
-          versa-pkgs = versatusDrv;
-          default = versa-pkgs;
+          versaNodeBin = versaNodeDrv;
+          lasrNodeBin = lasrNodeDrv;
+          default = versaNodeBin;
         } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
           protocol-llvm-coverage = craneLibLlvmTools.cargoLlvmCov (protocolArgs // {
-            inherit cargoArtifacts;
+            cargoArtifacts = protocolDeps;
           });
         };
 
-        apps.default = flake-utils.lib.mkApp {
-          drv = versatusDrv;
+        apps = rec {
+          versaNodeBin = flake-utils.lib.mkApp {
+            drv = versaNodeDrv;
+          };
+          lasrNodeBin = flake-utils.lib.mkApp {
+            drv = lasrNodeDrv;
+          };
+          default = versaNodeBin;
         };
 
         devShells = rec {
@@ -159,12 +227,13 @@
           };
           protocol-dev = craneLib.devShell {
             # Inherit inputs from checks.
-            checks = self.checks.${system};
+            checks = self.versaNodeChecks.${system};
             # Explicit rebinding since the environment args aren't
             # inherited from `checks` like the packages are.
             LIBCLANG_PATH = protocolArgs.LIBCLANG_PATH;
             ROCKSDB_LIB_DIR = protocolArgs.ROCKSDB_LIB_DIR;
           };
+          lasr-dev = craneLib.devShell { checks = self.lasrNodeChecks.${system}; };
           default = protocol-dev;
         };
       });

@@ -59,6 +59,22 @@
         "type": "github"
       }
     },
+    "lasr": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1710915784,
+        "narHash": "sha256-W9gTq1+EqapM4QH0HiJ1Q8Qn4Rd4r2mDa89qXNanr0E=",
+        "owner": "versatus",
+        "repo": "lasr",
+        "rev": "311a9fcfea7be7f3bb31bf23009209267b7b7385",
+        "type": "github"
+      },
+      "original": {
+        "owner": "versatus",
+        "repo": "lasr",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1710734606,
@@ -80,6 +96,7 @@
         "crane": "crane",
         "fenix": "fenix",
         "flake-utils": "flake-utils",
+        "lasr": "lasr",
         "nixpkgs": "nixpkgs",
         "versatus": "versatus"
       }
