@@ -155,7 +155,12 @@
             '';
           };
           versa-rs = pkgs.mkShell {
-            buildInputs = [ rustToolchain ];
+            buildInputs = [ rustToolchain ] ++ (with pkgs; lib.optionals stdenv.isDarwin [
+            # Additional darwin specific inputs
+            libiconv
+            darwin.apple_sdk.frameworks.Security
+            darwin.apple_sdk.frameworks.SystemConfiguration
+          ]);
             shellHook = ''
               echo "Welcome to versatus, happy hacking 🦀"
             '';
