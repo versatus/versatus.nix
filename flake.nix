@@ -1,5 +1,7 @@
 {
-  description = "Build a cargo project";
+  description =
+    "A Nix flake for the Versatus labs ecosystem that builds Versatus binaries and provides
+    development environments for building on Versatus repositories for supported systems.";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
