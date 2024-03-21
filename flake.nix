@@ -19,6 +19,7 @@
 
     flake-utils.url = "github:numtide/flake-utils";
 
+    # TODO: enable checks
     # advisory-db = {
     #   url = "github:rustsec/advisory-db";
     #   flake = false;
@@ -77,7 +78,8 @@
         lasrArgs = {
           src = lasrSrc;
           strictDeps = true;
-          buildInputs = [ rustToolchain.darwin-pkgs ];
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [ pkgs.openssl.dev rustToolchain.darwin-pkgs ];
         };
 
         # Build *just* the cargo dependencies, so we can reuse
@@ -99,6 +101,7 @@
         });
       in
       {
+        # TODO: enable checks
         # TODO: see if these checks can be rolled back into `self.checks`
         # then inherit the relevant packages into the `devShell`s
         versaNodeChecks = {
@@ -200,9 +203,11 @@
 
         apps = rec {
           versaNodeBin = flake-utils.lib.mkApp {
+            name = "versa";
             drv = versaNodeDrv;
           };
           lasrNodeBin = flake-utils.lib.mkApp {
+            name = "lasr_node";
             drv = lasrNodeDrv;
           };
           default = versaNodeBin;
