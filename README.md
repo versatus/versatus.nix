@@ -41,11 +41,12 @@ nix develop .#protocol-dev
 ### Development Shells
 
 - `.#protocol-dev` - tools necessary for building the Versatus protocol
+- `.#lasr-dev` - tools necessary for building the Versatus LASR protocol
+- `.#versa-rs` - Rust language tools for building the `versatus-rust` quickstart kit
 - `.#versa-hs` - Haskell language tools for building the `versatus-haskell` quickstart kit 
 
 > Note: Coming soon:
-- `.#compute-dev` - tools necessary for building the Versatus compute stack
-- `.#versa-rs` - Rust language tools for building the `versatus-rust` quickstart kit
+- `.#compute-dev` - tools necessary for building the Versatus compute stack (for now this is part of protocol-dev)
 - `.#versa-py` - Python language tools for building the `versatus-python` quickstart kit
 - `.#versa-js` - JavaScript language tools for building the `versatus-javascript` quickstart kit
 - `.#versa-c` - C language tools for building the `versatus-c` quickstart kit
