@@ -58,6 +58,7 @@
 
         # Dependency packages of each binary
         protocolArgs = {
+          pname = "versa";
           src = versaSrc;
           strictDeps = true;
 
@@ -76,6 +77,8 @@
           ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
         };
         lasrArgs = {
+          pname = "lasr_node";
+          version = "1";
           src = lasrSrc;
           strictDeps = true;
           nativeBuildInputs = [ pkgs.pkg-config ];
@@ -90,11 +93,13 @@
         # Build the actual crate itself, reusing the dependency
         # artifacts from above.
         versaNodeDrv = craneLib.buildPackage (protocolArgs // {
+          pname = "versa";
           doCheck = false; # disables `cargo test` during `nix flake check`
           cargoArtifacts = protocolDeps;
           cargoExtraArgs = "--locked --bin versa";
         });
         lasrNodeDrv = craneLib.buildPackage (lasrArgs // {
+          pname = "lasr_node";
           doCheck = false;
           cargoArtifacts = lasrDeps;
           cargoExtraArgs = "--locked --bin lasr_node";
@@ -201,17 +206,17 @@
           });
         };
 
-        apps = rec {
-          versaNodeBin = flake-utils.lib.mkApp {
-            name = "versa";
-            drv = versaNodeDrv;
-          };
-          lasrNodeBin = flake-utils.lib.mkApp {
-            name = "lasr_node";
-            drv = lasrNodeDrv;
-          };
-          default = versaNodeBin;
-        };
+        # apps = rec {
+        #   versaNodeBin = flake-utils.lib.mkApp {
+        #     name = "versa";
+        #     drv = versaNodeDrv;
+        #   };
+        #   lasrNodeBin = flake-utils.lib.mkApp {
+        #     name = "lasr_node";
+        #     drv = lasrNodeDrv;
+        #   };
+        #   default = versaNodeBin;
+        # };
 
         devShells = rec {
           default = protocol-dev;
