@@ -34,9 +34,12 @@
       url = "github:versatus/lasr";
       flake = false;
     };
+
+    rust-overlay.url = "github:oxalica/rust-overlay";
+    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
+  outputs = { self, nixpkgs, crane, fenix, flake-utils, rust-overlay, ... }:
     # TODO: Define supported systems
     flake-utils.lib.eachDefaultSystem (system:
       let
@@ -198,13 +201,69 @@
 
         packages = rec {
           versaNodeBin = versaNodeDrv;
-          lasrNodeBin = lasrNodeDrv;
-          default = versaNodeBin;
-        } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-          protocol-llvm-coverage = craneLib.cargoLlvmCov (protocolArgs // {
-            cargoArtifacts = protocolDeps;
-          });
-        };
+
+          lasr-cli-static = 
+            let
+              staticPkgs = import nixpkgs {
+                inherit system;
+                #overlays = [ fenix.overlays.default ];
+                overlays = [ (import rust-overlay) ];
+              };
+
+              archPrefix = builtins.elemAt (pkgs.lib.strings.split "-" system) 0;
+
+              staticCraneLib =
+                let
+                  #rustToolchain =staticPkgs.fenix.fromToolchainFile {
+                  #  file = versatus + "/rust-toolchain.toml";
+                  #  sha256 = "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
+                  #};
+                  rustToolchain = staticPkgs.rust-bin.stable.latest.default.override {
+                    targets = [ "${archPrefix}-unknown-linux-musl" ];
+                  };
+                in
+                (crane.mkLib staticPkgs).overrideToolchain rustToolchain;
+
+              lasrFunction = { stdenv, pkg-config, openssl, libiconv, darwin }:
+                staticCraneLib.buildPackage {
+                  pname = "lasr_node";
+                  version = "1";
+                  src = lasrSrc;
+                  strictDeps = true;
+                  nativeBuildInputs = [ pkg-config ];
+                  buildInputs = [ 
+                    openssl
+                  ] ++ lib.optionals stdenv.isDarwin [
+                    libiconv
+                    darwin.apple_sdk.frameworks.Security
+                    darwin.apple_sdk.frameworks.SystemConfiguration
+                  ];
+
+                  doCheck = false;
+                  cargoExtraArgs = "--locked --bin lasr_cli";
+
+                  CARGO_BUILD_TARGET = "${archPrefix}-unknown-linux-musl";
+                  CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
+                };
+              
+            in
+              lasrFunction { 
+                # we should be able to call this function with staticPkgs.pkgsStatic.callPackage
+                # but then we end up with a static-by-default stdenv which the crane tooling does not
+                # seem to like. crane tooling wants a normal stdenv but static deps.
+                inherit (pkgs) stdenv pkg-config;
+                inherit (pkgs.pkgsStatic) openssl;
+                libiconv = null;
+                darwin = null;
+              };
+
+        lasrNodeBin = lasrNodeDrv;
+        default = versaNodeBin;
+      } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+        protocol-llvm-coverage = craneLib.cargoLlvmCov (protocolArgs // {
+          cargoArtifacts = protocolDeps;
+        });
+      };
 
         # apps = rec {
         #   versaNodeBin = flake-utils.lib.mkApp {
