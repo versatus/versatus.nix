@@ -39,7 +39,7 @@
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, crane, fenix, flake-utils, rust-overlay, ... }:
+  outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
     # TODO: Define supported systems
     flake-utils.lib.eachDefaultSystem (system:
       let
@@ -208,15 +208,15 @@
               target = "${archPrefix}-unknown-linux-musl";
 
               staticCraneLib =
-                let muslToolchain = with fenix.packages.${system}; combine [
+                let rustMuslToolchain = with fenix.packages.${system}; combine [
                     minimal.cargo
                     minimal.rustc
                     targets.${target}.latest.rust-std
                   ];
                 in
-                (crane.mkLib pkgs).overrideToolchain muslToolchain;
+                (crane.mkLib pkgs).overrideToolchain rustMuslToolchain;
 
-              lasrFunction = { stdenv, pkg-config, openssl, libiconv, darwin }:
+              buildLasrCliStatic = { stdenv, pkg-config, openssl, libiconv, darwin }:
                 staticCraneLib.buildPackage {
                   pname = "lasr_node";
                   version = "1";
@@ -235,7 +235,7 @@
                   CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
                 };
             in
-            pkgs.pkgsMusl.callPackage lasrFunction {}; # needs fix, not available on darwin systems
+            pkgs.pkgsMusl.callPackage buildLasrCliStatic {}; # needs fix, pkgsMusl not available on darwin systems
 
         lasrNodeBin = lasrNodeDrv;
         default = versaNodeBin;
