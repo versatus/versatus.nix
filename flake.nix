@@ -204,42 +204,38 @@
 
           lasr-cli-static = 
             let
-              staticPkgs = import nixpkgs {
-                inherit system;
-              };
-
               archPrefix = builtins.elemAt (pkgs.lib.strings.split "-" system) 0;
+              target = "${archPrefix}-unknown-linux-musl";
 
               staticCraneLib =
-                let 
-                  rustToolchain =
-                    fenix.packages.${system}.targets."${archPrefix}-unknown-linux-musl".stable.toolchain; 
+                let muslToolchain = with fenix.packages.${system}; combine [
+                    minimal.cargo
+                    minimal.rustc
+                    targets.${target}.latest.rust-std
+                  ];
                 in
-                (crane.mkLib staticPkgs).overrideToolchain rustToolchain;
+                (crane.mkLib pkgs).overrideToolchain muslToolchain;
 
-              lasrFunction = { stdenv, pkg-config, cargo, openssl, libiconv, darwin }:
+              lasrFunction = { stdenv, pkg-config, openssl, libiconv, darwin }:
                 staticCraneLib.buildPackage {
                   pname = "lasr_node";
                   version = "1";
                   src = lasrSrc;
                   strictDeps = true;
-                  nativeBuildInputs = [ pkg-config cargo ];
+                  nativeBuildInputs = [ pkg-config ];
                   buildInputs = [ 
-                    openssl
-                  ] ++ lib.optionals stdenv.isDarwin [
-                    libiconv
-                    darwin.apple_sdk.frameworks.Security
-                    darwin.apple_sdk.frameworks.SystemConfiguration
+                    (openssl.override { static = true; })
+                    rustToolchain.darwin-pkgs
                   ];
 
                   doCheck = false;
                   cargoExtraArgs = "--locked --bin lasr_cli";
 
-                  CARGO_BUILD_TARGET = "${archPrefix}-unknown-linux-musl";
+                  CARGO_BUILD_TARGET = target;
                   CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
                 };
             in
-              staticPkgs.pkgsStatic.callPackage lasrFunction { };
+            pkgs.pkgsMusl.callPackage lasrFunction {}; # needs fix, not available on darwin systems
 
         lasrNodeBin = lasrNodeDrv;
         default = versaNodeBin;
