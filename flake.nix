@@ -206,31 +206,24 @@
             let
               staticPkgs = import nixpkgs {
                 inherit system;
-                #overlays = [ fenix.overlays.default ];
-                overlays = [ (import rust-overlay) ];
               };
 
               archPrefix = builtins.elemAt (pkgs.lib.strings.split "-" system) 0;
 
               staticCraneLib =
-                let
-                  #rustToolchain =staticPkgs.fenix.fromToolchainFile {
-                  #  file = versatus + "/rust-toolchain.toml";
-                  #  sha256 = "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
-                  #};
-                  rustToolchain = staticPkgs.rust-bin.stable.latest.default.override {
-                    targets = [ "${archPrefix}-unknown-linux-musl" ];
-                  };
+                let 
+                  rustToolchain =
+                    fenix.packages.${system}.targets."${archPrefix}-unknown-linux-musl".stable.toolchain; 
                 in
                 (crane.mkLib staticPkgs).overrideToolchain rustToolchain;
 
-              lasrFunction = { stdenv, pkg-config, openssl, libiconv, darwin }:
+              lasrFunction = { stdenv, pkg-config, cargo, openssl, libiconv, darwin }:
                 staticCraneLib.buildPackage {
                   pname = "lasr_node";
                   version = "1";
                   src = lasrSrc;
                   strictDeps = true;
-                  nativeBuildInputs = [ pkg-config ];
+                  nativeBuildInputs = [ pkg-config cargo ];
                   buildInputs = [ 
                     openssl
                   ] ++ lib.optionals stdenv.isDarwin [
@@ -245,17 +238,8 @@
                   CARGO_BUILD_TARGET = "${archPrefix}-unknown-linux-musl";
                   CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
                 };
-              
             in
-              lasrFunction { 
-                # we should be able to call this function with staticPkgs.pkgsStatic.callPackage
-                # but then we end up with a static-by-default stdenv which the crane tooling does not
-                # seem to like. crane tooling wants a normal stdenv but static deps.
-                inherit (pkgs) stdenv pkg-config;
-                inherit (pkgs.pkgsStatic) openssl;
-                libiconv = null;
-                darwin = null;
-              };
+              staticPkgs.pkgsStatic.callPackage lasrFunction { };
 
         lasrNodeBin = lasrNodeDrv;
         default = versaNodeBin;
