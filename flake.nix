@@ -197,9 +197,13 @@
         };
 
         packages = rec {
-          versaNodeBin = versaNodeDrv;
+          default = versa;
 
-          lasr-cli-static = 
+          versa = versaNodeDrv;
+
+          lasr_node = lasrNodeDrv;
+
+          lasr_cli =
             let
               archPrefix = builtins.elemAt (pkgs.lib.strings.split "-" system) 0;
               target = "${archPrefix}-unknown-linux-musl";
@@ -220,7 +224,7 @@
                   src = lasrSrc;
                   strictDeps = true;
                   nativeBuildInputs = [ pkg-config ];
-                  buildInputs = [ 
+                  buildInputs = [
                     (openssl.override { static = true; })
                     rustToolchain.darwin-pkgs
                   ];
@@ -234,13 +238,11 @@
             in
             pkgs.pkgsMusl.callPackage buildLasrCliStatic {}; # needs fix, pkgsMusl not available on darwin systems
 
-        lasrNodeBin = lasrNodeDrv;
-        default = versaNodeBin;
-      } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-        protocol-llvm-coverage = craneLib.cargoLlvmCov (protocolArgs // {
-          cargoArtifacts = protocolDeps;
-        });
-      };
+        } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+          protocol-llvm-coverage = craneLib.cargoLlvmCov (protocolArgs // {
+            cargoArtifacts = protocolDeps;
+          });
+        };
 
         # apps = rec {
         #   versaNodeBin = flake-utils.lib.mkApp {
