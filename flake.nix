@@ -34,9 +34,6 @@
       url = "github:versatus/lasr";
       flake = false;
     };
-
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
