@@ -238,6 +238,48 @@
             in
             pkgs.pkgsMusl.callPackage buildLasrCliStatic {}; # needs fix, pkgsMusl not available on darwin systems
 
+          lasr_cli_windows =
+            let
+              crossPkgs = import nixpkgs {
+                crossSystem = pkgs.lib.systems.examples.mingwW64;
+                localSystem = system;
+              };
+              craneLib = 
+                let 
+                  rustToolchain = with fenix.packages.${system}; combine [
+                      minimal.cargo
+                      minimal.rustc
+                      targets.x86_64-pc-windows-gnu.latest.rust-std
+                    ];
+                in
+                (crane.mkLib crossPkgs).overrideToolchain rustToolchain;
+
+              inherit (crossPkgs.stdenv.targetPlatform.rust)
+                cargoEnvVarTarget cargoShortTarget;
+
+              buildLasrCli = { stdenv, pkg-config, openssl, libiconv, windows }:
+                craneLib.buildPackage {
+                  pname = "lasr_node";
+                  version = "1";
+                  src = lasrSrc;
+                  strictDeps = true;
+                  nativeBuildInputs = [ pkg-config ];
+                  buildInputs = [
+                    (openssl.override { static = true; }) # if things don't work: use normal `openssl`
+                    windows.pthreads
+                  ];
+
+                  doCheck = false;
+                  cargoExtraArgs = "--locked --bin lasr_cli";
+
+                  CARGO_BUILD_TARGET = cargoShortTarget;
+                  CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static"; # if things don't work out: remove this
+                  "CARGO_TARGET_${cargoEnvVarTarget}_LINKER" = "${stdenv.cc.targetPrefix}cc";
+                  HOST_CC = "${stdenv.cc.nativePrefix}cc";
+                };
+            in
+            crossPkgs.callPackage buildLasrCli {};
+
         } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
           protocol-llvm-coverage = craneLib.cargoLlvmCov (protocolArgs // {
             cargoArtifacts = protocolDeps;
