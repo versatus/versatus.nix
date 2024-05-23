@@ -4,141 +4,336 @@
     development environments for building on Versatus repositories for supported systems.";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
-    fenix-rust = {
-      url = "github:nix-community/fenix";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+
+    crane = {
+      url = "github:ipetkov/crane";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.rust-analyzer-src.follows = "";
+    };
+
+    flake-utils.url = "github:numtide/flake-utils";
+
+    # TODO: enable checks
+    # advisory-db = {
+    #   url = "github:rustsec/advisory-db";
+    #   flake = false;
+    # };
+
     versatus = {
       url = "github:versatus/versatus";
       flake = false;
     };
+
+    lasr = {
+      url = "github:versatus/lasr";
+      flake = false;
+    };
   };
 
-  outputs = inputs: let
-    # Updates the systems that Versatus binaries support
-    # and dev-shells can be built for
-    flake-utils.supportedSystem = [
-      "x86_64-linux"
-      "x86_64-darwin"
-      "aarch64-linux"
-      "aarch64-darwin"
-    ];
-    flake-utils.eachSupportedSystem =
-      inputs.flake-utils.lib.eachSystem flake-utils.supportedSystem;
+  outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
+    # TODO: Define supported systems
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+        inherit (pkgs) lib;
 
-    # @Function
-    #
-    # @Input: `nixpkgs`
-    # @Output: Attribute set of dev-shells
-    mkDevShells = pkgs: let
-      rust-toolchain = pkgs.fenix.fromToolchainFile {
-        file = inputs.versatus + "/rust-toolchain.toml";
-        sha256 = "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
-      };
-      # Wrap Stack to work with our Nix integration. We don't want to modify
-      # stack.yaml so non-Nix users don't notice anything.
-      # --no-nix:         We don't want Stack's way of integrating Nix.
-      # --system-ghc:     Use the existing GHC on PATH (will come from this Nix file)
-      # --no-install-ghc: Don't try to install GHC if no matching GHC found on PATH
-      stack-wrapped = pkgs.symlinkJoin {
-        name = "stack"; # will be available as the usual `stack` in terminal
-        paths = [ pkgs.stack ];
-        buildInputs = [ pkgs.makeWrapper ];
-        postBuild = ''
-          wrapProgram $out/bin/stack \
-            --add-flags "\
-              --no-nix \
-              --system-ghc \
-              --no-install-ghc \
-            "
-        '';
-      };
-      # Uses the latest compatible nixpkgs version.
-      # Updating nixpkgs with `nix flake update` may break this.
-      hs-pkgs = pkgs.haskell.packages.ghc963;
-      haskellBuildInputs = [
-        stack-wrapped
-      ] ++ (with hs-pkgs; [
-        ghc
-        ghcid
-        cabal-install
-        ormolu
-        hlint
-        hoogle
-        haskell-language-server
-        implicit-hie
-        retrie
-        zlib
-      ]);
-    in rec {
-      protocol-dev = pkgs.mkShell {
-        name = "protocol-dev";
-        buildInputs = [
-          rust-toolchain
-        ] ++ (with pkgs; [
-          taplo # toml formatter
-          pkg-config
-          clang
-          rocksdb
-          openssl.dev
-          libiconv
-        ] ++ lib.optionals stdenv.isDarwin [
-          darwin.apple_sdk.frameworks.Security
-          darwin.apple_sdk.frameworks.SystemConfiguration
-        ]);
-        LIBCLANG_PATH="${pkgs.libclang.lib}/lib";
-        ROCKSDB_LIB_DIR="${pkgs.rocksdb}/lib";
-        shellHook = ''
-          echo "Welcome to versatus, happy hacking 🦀"
-        '';
-      };
+        # Language toolchains
+        rustToolchain = pkgs.callPackage ./dev/rust-toolchain.nix { inherit fenix; inherit versatus; };
+        haskellToolchain = pkgs.callPackage ./dev/haskell-toolchain.nix pkgs;
 
-      versa-hs = pkgs.mkShell {
-        name = "versa-hs";
-        buildInputs = haskellBuildInputs;
-        # Make external Nix c libraries like zlib known to GHC, like
-        # pkgs.haskell.lib.buildStackProject does
-        # https://github.com/NixOS/nixpkgs/blob/d64780ea0e22b5f61cd6012a456869c702a72f20/pkgs/development/haskell-modules/generic-stack-builder.nix#L38
-        LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath haskellBuildInputs;
-        shellHook = ''
-          echo "Welcome to versa-hs, happy hacking 🪲" 
-        '';
-      };
+        # Overrides the default crane rust-toolchain with fenix.
+        craneLib = crane.lib.${system}.overrideToolchain rustToolchain.fenix-pkgs;
 
-      default = protocol-dev;
-    };
+        # Cargo source files
+        versatus = self.inputs.versatus;
+        lasr = self.inputs.lasr;
+        versaSrc = craneLib.cleanCargoSource (craneLib.path (builtins.toString versatus));
+        lasrSrc = craneLib.cleanCargoSource (craneLib.path (builtins.toString lasr));
 
-    # @Function
-    #
-    # @Input: `currentSystem` specified by `supportedSystem`
-    # @Output: builds `devShell`s & Versatus packages 
-    mkOutput = system: let
-      pkgs = import inputs.nixpkgs {
-        inherit system;
-        overlays = [ inputs.fenix-rust.overlays.default ];
-      };
-    in {
-      # TODO: add mkPackages as part of output
-      # versa-pkgs = mkPackages pkgs;
+        # Dependency packages of each binary
+        protocolArgs = {
+          pname = "versa";
+          version = "1";
+          src = versaSrc;
+          strictDeps = true;
 
-      # TODO: finalize cross platform rust-toolchain
-      # fenix = {
-      #   default = pkgs.callPackage ./rust-toolchain.nix {
-      #     versatus = inputs.versatus;
-      #     rust-toolchain = pkgs.fenix.fromToolchainFile {
-      #       file = inputs.versatus + "/rust-toolchain.toml";
-      #       sha256 = "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
-      #     };
-      #   };
-      # };
-      devShells = mkDevShells pkgs;
-      formatter = pkgs.alejandra;
-    };
+          # Inputs that must be available at the time of the build
+          nativeBuildInputs = with pkgs; [
+            pkg-config # necessary for linking OpenSSL
+            clang
+          ];
 
-    # The output for each system.
-    systemOutputs = flake-utils.eachSupportedSystem mkOutput;
-  in
-    systemOutputs // { inherit flake-utils; };
+          buildInputs = with pkgs; [
+            rocksdb
+            openssl.dev
+          ] ++ [ rustToolchain.darwin-pkgs ];
+          
+          LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
+          ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
+        };
+        lasrArgs = {
+          pname = "lasr_node";
+          version = "1";
+          src = lasrSrc;
+          strictDeps = true;
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [ pkgs.openssl.dev rustToolchain.darwin-pkgs ];
+        };
+
+        # Build *just* the cargo dependencies, so we can reuse
+        # all of that work (e.g. via cachix) when running in CI
+        protocolDeps = craneLib.buildDepsOnly protocolArgs;
+        lasrDeps = craneLib.buildDepsOnly lasrArgs;
+
+        # Build the actual crate itself, reusing the dependency
+        # artifacts from above.
+        versaNodeDrv = craneLib.buildPackage (protocolArgs // {
+          pname = "versa";
+          version = "1";
+          doCheck = false; # disables `cargo test` during `nix flake check`
+          cargoArtifacts = protocolDeps;
+          cargoExtraArgs = "--locked --bin versa";
+        });
+        lasrNodeDrv = craneLib.buildPackage (lasrArgs // {
+          pname = "lasr_node";
+          version = "1";
+          doCheck = false;
+          cargoArtifacts = lasrDeps;
+          cargoExtraArgs = "--locked --bin lasr_node";
+        });
+      in
+      {
+        # TODO: enable checks
+        # TODO: see if these checks can be rolled back into `self.checks`
+        # then inherit the relevant packages into the `devShell`s
+        versaNodeChecks = {
+          # Build the crates as part of `nix flake check` for convenience
+          versaNodeBuild = versaNodeDrv;
+
+          # Run clippy (and deny all warnings) on the crate source,
+          # again, resuing the dependency artifacts from above.
+          #
+          # Note that this is done as a separate derivation so that
+          # we can block the CI if there are issues here, but not
+          # prevent downstream consumers from building our crate by itself.
+          versa-node-clippy = craneLib.cargoClippy (protocolArgs // {
+            cargoArtifacts = protocolDeps;
+            cargoClippyExtraArgs = "--all-targets -- --deny warnings";
+          });
+
+          versa-node-doc = craneLib.cargoDoc (protocolArgs // {
+            cargoArtifacts = protocolDeps;
+          });
+
+          # Check formatting
+          versa-node-fmt = craneLib.cargoFmt {
+            src = versaSrc;
+          };
+
+          # Audit dependencies
+          # my-crate-audit = craneLib.cargoAudit {
+          #   inherit src advisory-db;
+          # };
+
+          # # Audit licenses
+          # my-crate-deny = craneLib.cargoDeny {
+          #   inherit src;
+          # };
+
+          # Run tests with cargo-nextest
+          # Consider setting `doCheck = false` on `my-crate` if you do not want
+          # the tests to run twice
+          # my-crate-nextest = craneLib.cargoNextest (commonArgs // {
+          #   inherit cargoArtifacts;
+          #   partitions = 1;
+          #   partitionType = "count";
+          # });
+        };
+        lasrNodeChecks = {
+          # Build the crates as part of `nix flake check` for convenience
+          lasrNodeBuild = lasrNodeDrv;
+
+          # Run clippy (and deny all warnings) on the crate source,
+          # again, resuing the dependency artifacts from above.
+          #
+          # Note that this is done as a separate derivation so that
+          # we can block the CI if there are issues here, but not
+          # prevent downstream consumers from building our crate by itself.
+          # lasr-node-clippy = craneLib.cargoClippy (lasrArgs // {
+          #   cargoArtifacts = lasrDeps;
+          #   cargoClippyExtraArgs = "--all-targets -- --deny warnings";
+          # });
+
+          lasr-node-doc = craneLib.cargoDoc (lasrArgs // {
+            cargoArtifacts = lasrDeps;
+          });
+
+          # Check formatting
+          # lasr-node-fmt = craneLib.cargoFmt {
+          #   src = lasrSrc;
+          # };
+
+          # Audit dependencies
+          # my-crate-audit = craneLib.cargoAudit {
+          #   inherit src advisory-db;
+          # };
+
+          # # Audit licenses
+          # my-crate-deny = craneLib.cargoDeny {
+          #   inherit src;
+          # };
+
+          # Run tests with cargo-nextest
+          # Consider setting `doCheck = false` on `my-crate` if you do not want
+          # the tests to run twice
+          # my-crate-nextest = craneLib.cargoNextest (commonArgs // {
+          #   inherit cargoArtifacts;
+          #   partitions = 1;
+          #   partitionType = "count";
+          # });
+        };
+
+        packages = rec {
+          default = versa;
+
+          versa = versaNodeDrv;
+
+          lasr_node = lasrNodeDrv;
+
+          lasr_cli = # this works on Linux only at the moment
+            let
+              archPrefix = builtins.elemAt (pkgs.lib.strings.split "-" system) 0;
+              target = "${archPrefix}-unknown-linux-musl";
+
+              staticCraneLib =
+                let rustMuslToolchain = with fenix.packages.${system}; combine [
+                    minimal.cargo
+                    minimal.rustc
+                    targets.${target}.latest.rust-std
+                  ];
+                in
+                (crane.mkLib pkgs).overrideToolchain rustMuslToolchain;
+
+              buildLasrCliStatic = { stdenv, pkg-config, openssl, libiconv, darwin }:
+                staticCraneLib.buildPackage {
+                  pname = "lasr_cli";
+                  version = "1";
+                  src = lasrSrc;
+                  strictDeps = true;
+                  nativeBuildInputs = [ pkg-config ];
+                  buildInputs = [
+                    (openssl.override { static = true; })
+                    rustToolchain.darwin-pkgs
+                  ];
+
+                  doCheck = false;
+                  cargoExtraArgs = "--locked --bin lasr_cli";
+
+                  CARGO_BUILD_TARGET = target;
+                  CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
+                };
+            in
+            pkgs.pkgsMusl.callPackage buildLasrCliStatic {}; # TODO: needs fix, pkgsMusl not available on darwin systems
+
+          # TODO: Getting CC linker error
+          # lasr_cli_windows =
+          #   let
+          #     crossPkgs = import nixpkgs {
+          #       crossSystem = pkgs.lib.systems.examples.mingwW64;
+          #       localSystem = system;
+          #     };
+          #     craneLib = 
+          #       let 
+          #         rustToolchain = with fenix.packages.${system}; combine [
+          #             minimal.cargo
+          #             minimal.rustc
+          #             targets.x86_64-pc-windows-gnu.latest.rust-std
+          #           ];
+          #       in
+          #       (crane.mkLib crossPkgs).overrideToolchain rustToolchain;
+
+          #     inherit (crossPkgs.stdenv.targetPlatform.rust)
+          #       cargoEnvVarTarget cargoShortTarget;
+
+          #     buildLasrCli = { stdenv, pkg-config, openssl, libiconv, windows }:
+          #       craneLib.buildPackage {
+          #         pname = "lasr_node";
+          #         version = "1";
+          #         src = lasrSrc;
+          #         strictDeps = true;
+          #         nativeBuildInputs = [ pkg-config ];
+          #         buildInputs = [
+          #           (openssl.override { static = true; })
+          #           windows.pthreads
+          #         ];
+
+          #         doCheck = false;
+          #         cargoExtraArgs = "--locked --bin lasr_cli";
+
+          #         CARGO_BUILD_TARGET = cargoShortTarget;
+          #         CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
+          #         "CARGO_TARGET_${cargoEnvVarTarget}_LINKER" = "${stdenv.cc.targetPrefix}cc";
+          #         HOST_CC = "${stdenv.cc.nativePrefix}cc";
+          #       };
+          #   in
+          #   crossPkgs.callPackage buildLasrCli {};
+
+        } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+          protocol-llvm-coverage = craneLib.cargoLlvmCov (protocolArgs // {
+            cargoArtifacts = protocolDeps;
+          });
+        };
+
+        # apps = rec {
+        #   versaNodeBin = flake-utils.lib.mkApp {
+        #     name = "versa";
+        #     drv = versaNodeDrv;
+        #   };
+        #   lasrNodeBin = flake-utils.lib.mkApp {
+        #     name = "lasr_node";
+        #     drv = lasrNodeDrv;
+        #   };
+        #   default = versaNodeBin;
+        # };
+
+        devShells = rec {
+          default = protocol-dev;
+          # Developer environments for Versatus repos
+          protocol-dev = craneLib.devShell {
+            # Inherit inputs from checks.
+            checks = self.versaNodeChecks.${system};
+            # Explicit rebinding since the environment args aren't
+            # inherited from `checks` like the packages are.
+            LIBCLANG_PATH = protocolArgs.LIBCLANG_PATH;
+            ROCKSDB_LIB_DIR = protocolArgs.ROCKSDB_LIB_DIR;
+          };
+          lasr-dev = craneLib.devShell { checks = self.lasrNodeChecks.${system}; };
+
+          # Language developer environments for building smart contracts
+          # with Versatus language SDKs
+          versa-rs = pkgs.mkShell {
+            buildInputs = rustToolchain.complete;
+            shellHook = ''
+              echo "Welcome to versatus, happy hacking 🦀"
+            '';
+          };
+          versa-hs = pkgs.mkShell {
+            name = "versa-hs";
+            buildInputs = haskellToolchain;
+            # Make external Nix c libraries like zlib known to GHC, like
+            # `pkgs.haskell.lib.buildStackProject` does
+            # https://github.com/NixOS/nixpkgs/blob/d64780ea0e22b5f61cd6012a456869c702a72f20/pkgs/development/haskell-modules/generic-stack-builder.nix#L38
+            LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath haskellToolchain;
+            shellHook = ''
+              echo "Welcome to versa-hs, happy hacking 🪲" 
+            '';
+          };
+        };
+      });
 }
