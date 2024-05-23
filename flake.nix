@@ -59,6 +59,7 @@
         # Dependency packages of each binary
         protocolArgs = {
           pname = "versa";
+          version = "1";
           src = versaSrc;
           strictDeps = true;
 
@@ -94,12 +95,14 @@
         # artifacts from above.
         versaNodeDrv = craneLib.buildPackage (protocolArgs // {
           pname = "versa";
+          version = "1";
           doCheck = false; # disables `cargo test` during `nix flake check`
           cargoArtifacts = protocolDeps;
           cargoExtraArgs = "--locked --bin versa";
         });
         lasrNodeDrv = craneLib.buildPackage (lasrArgs // {
           pname = "lasr_node";
+          version = "1";
           doCheck = false;
           cargoArtifacts = lasrDeps;
           cargoExtraArgs = "--locked --bin lasr_node";
@@ -203,7 +206,7 @@
 
           lasr_node = lasrNodeDrv;
 
-          lasr_cli =
+          lasr_cli = # this works on Linux only at the moment
             let
               archPrefix = builtins.elemAt (pkgs.lib.strings.split "-" system) 0;
               target = "${archPrefix}-unknown-linux-musl";
@@ -219,7 +222,7 @@
 
               buildLasrCliStatic = { stdenv, pkg-config, openssl, libiconv, darwin }:
                 staticCraneLib.buildPackage {
-                  pname = "lasr_node";
+                  pname = "lasr_cli";
                   version = "1";
                   src = lasrSrc;
                   strictDeps = true;
@@ -236,49 +239,50 @@
                   CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
                 };
             in
-            pkgs.pkgsMusl.callPackage buildLasrCliStatic {}; # needs fix, pkgsMusl not available on darwin systems
+            pkgs.pkgsMusl.callPackage buildLasrCliStatic {}; # TODO: needs fix, pkgsMusl not available on darwin systems
 
-          lasr_cli_windows =
-            let
-              crossPkgs = import nixpkgs {
-                crossSystem = pkgs.lib.systems.examples.mingwW64;
-                localSystem = system;
-              };
-              craneLib = 
-                let 
-                  rustToolchain = with fenix.packages.${system}; combine [
-                      minimal.cargo
-                      minimal.rustc
-                      targets.x86_64-pc-windows-gnu.latest.rust-std
-                    ];
-                in
-                (crane.mkLib crossPkgs).overrideToolchain rustToolchain;
+          # TODO: Getting CC linker error
+          # lasr_cli_windows =
+          #   let
+          #     crossPkgs = import nixpkgs {
+          #       crossSystem = pkgs.lib.systems.examples.mingwW64;
+          #       localSystem = system;
+          #     };
+          #     craneLib = 
+          #       let 
+          #         rustToolchain = with fenix.packages.${system}; combine [
+          #             minimal.cargo
+          #             minimal.rustc
+          #             targets.x86_64-pc-windows-gnu.latest.rust-std
+          #           ];
+          #       in
+          #       (crane.mkLib crossPkgs).overrideToolchain rustToolchain;
 
-              inherit (crossPkgs.stdenv.targetPlatform.rust)
-                cargoEnvVarTarget cargoShortTarget;
+          #     inherit (crossPkgs.stdenv.targetPlatform.rust)
+          #       cargoEnvVarTarget cargoShortTarget;
 
-              buildLasrCli = { stdenv, pkg-config, openssl, libiconv, windows }:
-                craneLib.buildPackage {
-                  pname = "lasr_node";
-                  version = "1";
-                  src = lasrSrc;
-                  strictDeps = true;
-                  nativeBuildInputs = [ pkg-config ];
-                  buildInputs = [
-                    (openssl.override { static = true; }) # if things don't work: use normal `openssl`
-                    windows.pthreads
-                  ];
+          #     buildLasrCli = { stdenv, pkg-config, openssl, libiconv, windows }:
+          #       craneLib.buildPackage {
+          #         pname = "lasr_node";
+          #         version = "1";
+          #         src = lasrSrc;
+          #         strictDeps = true;
+          #         nativeBuildInputs = [ pkg-config ];
+          #         buildInputs = [
+          #           (openssl.override { static = true; })
+          #           windows.pthreads
+          #         ];
 
-                  doCheck = false;
-                  cargoExtraArgs = "--locked --bin lasr_cli";
+          #         doCheck = false;
+          #         cargoExtraArgs = "--locked --bin lasr_cli";
 
-                  CARGO_BUILD_TARGET = cargoShortTarget;
-                  CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static"; # if things don't work out: remove this
-                  "CARGO_TARGET_${cargoEnvVarTarget}_LINKER" = "${stdenv.cc.targetPrefix}cc";
-                  HOST_CC = "${stdenv.cc.nativePrefix}cc";
-                };
-            in
-            crossPkgs.callPackage buildLasrCli {};
+          #         CARGO_BUILD_TARGET = cargoShortTarget;
+          #         CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
+          #         "CARGO_TARGET_${cargoEnvVarTarget}_LINKER" = "${stdenv.cc.targetPrefix}cc";
+          #         HOST_CC = "${stdenv.cc.nativePrefix}cc";
+          #       };
+          #   in
+          #   crossPkgs.callPackage buildLasrCli {};
 
         } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
           protocol-llvm-coverage = craneLib.cargoLlvmCov (protocolArgs // {
