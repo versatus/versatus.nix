@@ -6,6 +6,9 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
+
     crane = {
       url = "github:ipetkov/crane";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -36,7 +39,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
+  outputs = { self, nixpkgs, disko, crane, fenix, flake-utils, ... }:
     # TODO: Define supported systems
     flake-utils.lib.eachDefaultSystem (system:
       let
@@ -335,5 +338,16 @@
             '';
           };
         };
-      });
+      }) // {
+
+        nixosConfigurations.digitalocean = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            disko.nixosModules.disko
+            { disko.devices.disk.disk1.device = "/dev/vda"; }
+            ./system-configuration.nix
+            ./disk-configuration.nix
+          ];
+        };
+      };
 }
