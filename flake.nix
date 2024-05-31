@@ -305,8 +305,7 @@
         #   default = versaNodeBin;
         # };
 
-        devShells = rec {
-          default = protocol-dev;
+        devShells = {
           # Developer environments for Versatus repos
           protocol-dev = craneLib.devShell {
             # Inherit inputs from checks.
@@ -339,14 +338,13 @@
           };
         };
       }) // {
-
-        nixosConfigurations.digitalocean = nixpkgs.lib.nixosSystem {
-          system = "x86_64-linux";
+        nixosConfigurations.lasr_node = nixpkgs.lib.nixosSystem {
+          system = flake-utils.lib.system.x86_64-linux;
           modules = [
             disko.nixosModules.disko
-            { disko.devices.disk.disk1.device = "/dev/vda"; }
-            ./system-configuration.nix
+            { disko.devices.disk.digitalocean.device = "/dev/vda"; }
             ./disk-configuration.nix
+            ./system-configuration.nix
           ];
         };
       };
