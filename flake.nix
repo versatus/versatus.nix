@@ -343,8 +343,7 @@
           modules = [
             disko.nixosModules.disko
             { disko.devices.disk.digitalocean.device = "/dev/vda"; }
-            ./disk-configuration.nix
-            ./system-configuration.nix
+            ./deployments/configuration.nix
           ];
         };
       };

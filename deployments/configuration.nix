@@ -2,7 +2,9 @@
   imports = [
     (modulesPath + "/installer/scan/not-detected.nix")
     # https://github.com/NixOS/nixpkgs/blob/c5187508b11177ef4278edf19616f44f21cc8c69/nixos/modules/virtualisation/digital-ocean-config.nix
-    (modulesPath + "/virtualisation/digital-ocean-config.nix")
+    # (modulesPath + "/virtualisation/digital-ocean-config.nix")
+    (modulesPath + "/profiles/qemu-guest.nix")
+    ./disk-config.nix
   ];
   boot.loader.grub = {
     # no need to set devices, disko will add all devices that have a EF02 partition to the list already
@@ -14,10 +16,10 @@
 
   networking = {
     hostName = "lasr-node-server";
-    useDHCP = true;
-    interfaces.eth0.useDHCP = true;
+    # useDHCP = true;
+    # interfaces.eth0.useDHCP = true;
   };
-  time.timeZone = "UTC";
+  # time.timeZone = "UTC";
 
   environment.systemPackages = map lib.lowPrio [
     pkgs.curl
