@@ -1,9 +1,9 @@
 { modulesPath, config, lib, pkgs, ... }: {
   imports = [
     (modulesPath + "/installer/scan/not-detected.nix")
-    # https://github.com/NixOS/nixpkgs/blob/c5187508b11177ef4278edf19616f44f21cc8c69/nixos/modules/virtualisation/digital-ocean-config.nix
-    # (modulesPath + "/virtualisation/digital-ocean-config.nix")
     (modulesPath + "/profiles/qemu-guest.nix")
+    # https://github.com/NixOS/nixpkgs/blob/c5187508b11177ef4278edf19616f44f21cc8c69/nixos/modules/virtualisation/digital-ocean-config.nix
+    (modulesPath + "/virtualisation/digital-ocean-config.nix")
     ./disk-config.nix
   ];
   boot.loader.grub = {
@@ -12,14 +12,8 @@
     efiSupport = true;
     efiInstallAsRemovable = true;
   };
+  networking.useDHCP = lib.mkDefault true;
   services.openssh.enable = true;
-
-  networking = {
-    hostName = "lasr-node-server";
-    # useDHCP = true;
-    # interfaces.eth0.useDHCP = true;
-  };
-  # time.timeZone = "UTC";
 
   environment.systemPackages = map lib.lowPrio [
     pkgs.curl
@@ -32,9 +26,7 @@
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINQ66bGgeELzU/wZjpYxSlKIgMoROQxPx76vGdpS3lwc github.eureka@gmail.com" # dev-one
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAsUzc7Wg9FwImAMPc61K/zO9gvUDJVHwQ0+GTrO1mqJ github.eureka@gmail.com" # critter-tank
   ];
-  users.users.root = {
-    password = "";
-  };
+  users.users.root.password = "root";
 
   system.stateVersion = "23.11";
 }
