@@ -6,9 +6,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
-    disko.url = "github:nix-community/disko";
-    disko.inputs.nixpkgs.follows = "nixpkgs";
-
     crane = {
       url = "github:ipetkov/crane";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -39,7 +36,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, disko, crane, fenix, flake-utils, ... }:
+  outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
     # TODO: Define supported systems
     flake-utils.lib.eachDefaultSystem (system:
       let
@@ -209,40 +206,40 @@
 
           lasr_node = lasrNodeDrv;
 
-          lasr_cli = # this works on Linux only at the moment
-            let
-              archPrefix = builtins.elemAt (pkgs.lib.strings.split "-" system) 0;
-              target = "${archPrefix}-unknown-linux-musl";
+          # lasr_cli = # this works on Linux only at the moment
+          #   let
+          #     archPrefix = builtins.elemAt (pkgs.lib.strings.split "-" system) 0;
+          #     target = "${archPrefix}-unknown-linux-musl";
 
-              staticCraneLib =
-                let rustMuslToolchain = with fenix.packages.${system}; combine [
-                    minimal.cargo
-                    minimal.rustc
-                    targets.${target}.latest.rust-std
-                  ];
-                in
-                (crane.mkLib pkgs).overrideToolchain rustMuslToolchain;
+          #     staticCraneLib =
+          #       let rustMuslToolchain = with fenix.packages.${system}; combine [
+          #           minimal.cargo
+          #           minimal.rustc
+          #           targets.${target}.latest.rust-std
+          #         ];
+          #       in
+          #       (crane.mkLib pkgs).overrideToolchain rustMuslToolchain;
 
-              buildLasrCliStatic = { stdenv, pkg-config, openssl, libiconv, darwin }:
-                staticCraneLib.buildPackage {
-                  pname = "lasr_cli";
-                  version = "1";
-                  src = lasrSrc;
-                  strictDeps = true;
-                  nativeBuildInputs = [ pkg-config ];
-                  buildInputs = [
-                    (openssl.override { static = true; })
-                    rustToolchain.darwin-pkgs
-                  ];
+          #     buildLasrCliStatic = { stdenv, pkg-config, openssl, libiconv, darwin }:
+          #       staticCraneLib.buildPackage {
+          #         pname = "lasr_cli";
+          #         version = "1";
+          #         src = lasrSrc;
+          #         strictDeps = true;
+          #         nativeBuildInputs = [ pkg-config ];
+          #         buildInputs = [
+          #           (openssl.override { static = true; })
+          #           rustToolchain.darwin-pkgs
+          #         ];
 
-                  doCheck = false;
-                  cargoExtraArgs = "--locked --bin lasr_cli";
+          #         doCheck = false;
+          #         cargoExtraArgs = "--locked --bin lasr_cli";
 
-                  CARGO_BUILD_TARGET = target;
-                  CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
-                };
-            in
-            pkgs.pkgsMusl.callPackage buildLasrCliStatic {}; # TODO: needs fix, pkgsMusl not available on darwin systems
+          #         CARGO_BUILD_TARGET = target;
+          #         CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
+          #       };
+          #   in
+          #   pkgs.pkgsMusl.callPackage buildLasrCliStatic {}; # TODO: needs fix, pkgsMusl not available on darwin systems
 
           # TODO: Getting CC linker error
           # lasr_cli_windows =
@@ -337,14 +334,5 @@
             '';
           };
         };
-      }) // {
-        nixosConfigurations.lasr_node = nixpkgs.lib.nixosSystem {
-          system = flake-utils.lib.system.x86_64-linux;
-          modules = [
-            disko.nixosModules.disko
-            { disko.devices.disk.digitalocean.device = "/dev/vda"; }
-            ./deployments/configuration.nix
-          ];
-        };
-      };
-}
+      }); 
+  }
