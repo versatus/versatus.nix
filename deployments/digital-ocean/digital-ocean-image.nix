@@ -9,7 +9,7 @@ let
 in
 {
 
-  imports = [ (import ./digital-ocean-config.nix { inherit opts; }) ];
+  imports = [ ./digital-ocean-config.nix opts ];
 
   options = {
     virtualisation.digitalOceanImage.diskSize = mkOption {
