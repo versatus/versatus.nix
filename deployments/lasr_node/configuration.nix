@@ -1,0 +1,25 @@
+{ modulesPath, lib, pkgs, ... }:
+{
+  imports = lib.optional (builtins.pathExists ./do-userdata.nix) ./do-userdata.nix ++ [
+    (modulesPath + "/virtualisation/digital-ocean-config.nix")
+  ];
+
+  environment.systemPackages = with pkgs; [
+    curl
+    git
+    gvisor
+    overmind
+    docker
+    kubo
+    grpcurl
+  ];
+  # ] ++ [ lasr_node ];
+
+  # Add your SSH key and comment your username/system-name
+  users.users.root.openssh.authorizedKeys.keys = [
+    # eureka-cpu
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINQ66bGgeELzU/wZjpYxSlKIgMoROQxPx76vGdpS3lwc github.eureka@gmail.com" # dev-one
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAsUzc7Wg9FwImAMPc61K/zO9gvUDJVHwQ0+GTrO1mqJ github.eureka@gmail.com" # critter-tank
+  ];
+}
+
