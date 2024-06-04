@@ -1,19 +1,9 @@
-{ modulesPath, lib, pkgs, ... }:
-{
-  imports = [ (modulesPath + "/virtualisation/digital-ocean-config.nix") ];
-
+{ pkgs, ... }:
+let
+  common = import ../common.nix { inherit pkgs; };
+in
+common // {
   networking.hostName = "lasr-nightly-server";
-
-  environment.systemPackages = with pkgs; [
-    curl
-    git
-    gvisor
-    overmind
-    docker
-    kubo
-    grpcurl
-  ];
-  # ] ++ [ lasr_node ];
 
   # Add your SSH key and comment your username/system-name
   users.users.root.openssh.authorizedKeys.keys = [
@@ -22,4 +12,3 @@
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAsUzc7Wg9FwImAMPc61K/zO9gvUDJVHwQ0+GTrO1mqJ github.eureka@gmail.com" # critter-tank
   ];
 }
-
