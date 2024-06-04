@@ -9,7 +9,7 @@ let
 in
 {
 
-  imports = [ ./digital-ocean-config.nix opts ];
+  imports = [ (pkgs.callPackage ./digital-ocean-config.nix { inherit opts; }) ];
 
   options = {
     virtualisation.digitalOceanImage.diskSize = mkOption {
@@ -23,7 +23,7 @@ in
 
     virtualisation.digitalOceanImage.configFile = mkOption {
       type = with types; nullOr path;
-      default = ./config-file.nix { inherit opts; };
+      default = ./config-file.nix;
       description = ''
         A path to a configuration file which will be placed at
         `/etc/nixos/configuration.nix` and be used when switching
@@ -46,7 +46,7 @@ in
   #### implementation
   config = {
 
-    system.build.digitalOceanImage = import ../../lib/make-disk-image.nix {
+    system.build.digitalOceanImage = import <nixpkgs/nixos/lib/make-disk-image.nix> {
       name = "digital-ocean-image";
       format = "qcow2";
       postVM = let
