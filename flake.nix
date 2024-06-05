@@ -302,7 +302,8 @@
         #   default = versaNodeBin;
         # };
 
-        devShells = {
+        devShells = rec {
+          default = nix-dev;
           # Developer environments for Versatus repos
           protocol-dev = craneLib.devShell {
             # Inherit inputs from checks.
@@ -313,6 +314,12 @@
             ROCKSDB_LIB_DIR = protocolArgs.ROCKSDB_LIB_DIR;
           };
           lasr-dev = craneLib.devShell { checks = self.lasrNodeChecks.${system}; };
+          nix-dev = pkgs.mkShell {
+            buildInputs = with pkgs; [
+              nil
+              nixpkgs-fmt
+            ];
+          };
 
           # Language developer environments for building smart contracts
           # with Versatus language SDKs
