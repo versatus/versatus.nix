@@ -1,8 +1,5 @@
-{ pkgs, ... }:
-let
-  common = import ../common.nix { inherit pkgs; };
-in
-common // {
+{ ... }:
+{
   networking.hostName = "lasr-nightly-server";
 
   # Add your SSH key and comment your username/system-name
