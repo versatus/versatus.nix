@@ -34,14 +34,19 @@ jobs:
       id-token: "write"
       contents: "read"
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # this might remove tools that are actually needed,
+          # when set to "true" but frees about 6 GB
+          tool-cache: true
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
       # build development shells
       - run: nix develop .#protocol-dev
       - run: nix develop .#lasr-dev
       - run: nix develop .#versa-rs
-      # clean up rust paths before building next shell
-      - run: nix-collect-garbage -d
       - run: nix develop .#versa-hs
 
   check-digitalocean-images:

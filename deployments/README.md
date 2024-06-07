@@ -38,11 +38,10 @@ In the case of needing to update the configuration on a development server where
 there are two main ways to apply your changes, but both rely on the `nixos-rebuild switch` command with the option `--flake`.
 
 The first instinct for seasoned NixOS users would be to edit, and rebuild as if it was a local system, however this ins't
-the correct way to go about it when dealing with NixOS servers. I've tentatively made it to where attempting to do so will
-produce an error:
-> ERROR: Attempting to rebuild from a default configuration.
-
-Which will then walk you through the process of applying your changes, which is as follows:
+the correct way to go about it when dealing with NixOS servers. I've tentatively added instructions on how to properly go
+about rebuilding the system in the `configuration.nix` file, which (on the server) can be found at `/etc/nixos/configuration.nix`,
+the contents of which are more or less as follows:
+> Note that attempting to rebuild switch _will fail_ since the `configuration.nix` file does not have anything in it except these instructions.
 
 ### Rebuild From Your Local Machine
 This will be the most common way of adding **semi-permanent changes**, since it doesn't require the server
