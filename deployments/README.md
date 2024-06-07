@@ -84,3 +84,13 @@ Then rebuild from the flake:
 git add -A
 nixos-rebuild switch --flake .#<name-of-configuration>
 ```
+
+## Troubleshooting
+
+### Unable To Connect After Server Rebuild
+After rebuilding the server with `nixos-rebuild`, or the server is rebuilt from a newer
+version of the NixOS image, you may encounter an error when attempting to connect to the
+server via SSH. Multiple attempts of this will prompt you with a warning of potential
+"man-in-the-middle" attacks. To reset your relationship with the server navigate to your
+`~/.ssh` folder, and remove the server's host keys from the `known_hosts` file. You should
+be able to now connect to the server, which will prompt you to add the new keys to `~/.ssh/known_hosts`. 
