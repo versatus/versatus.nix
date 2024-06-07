@@ -36,12 +36,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       # build development shells
       - run: nix develop .#protocol-dev
       - run: nix develop .#lasr-dev
       - run: nix develop .#versa-rs
-      # clean up paths before building next shell
+      # clean up rust paths before building next shell
       - run: nix-collect-garbage -d
       - run: nix develop .#versa-hs
 
