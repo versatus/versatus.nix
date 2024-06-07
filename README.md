@@ -1,7 +1,8 @@
 # versatus.nix
 
 A Nix flake for the Versatus Labs ecosystem which provides reproducible build guarantees for Versatus 
-binaries and [development environments](#development-shells) for building Versatus repositories on [supported systems](#supported-systems).
+binaries, [development environments](#development-shells) for building Versatus repositories on [supported systems](#supported-systems)
+and [NixOS images & infrastructure for deploying Versatus services](./deployments/README.md).
 
 ## Prerequisites
 
@@ -28,7 +29,7 @@ First, ensure your system is listed under [Supported Systems](#supported-systems
 
 To enter a temporary [development shell](#development-shells) with `nix develop`:
 ```sh
-nix develop .#protocol-dev
+nix develop .#<development-shell>
 ```
 
 ### Supported Systems
@@ -40,6 +41,7 @@ nix develop .#protocol-dev
 
 ### Development Shells
 
+- `.#nix-dev` - tools necessary for building & maintaining the `versatus.nix` flake
 - `.#protocol-dev` - tools necessary for building the Versatus protocol
 - `.#lasr-dev` - tools necessary for building the Versatus LASR protocol
 - `.#versa-rs` - Rust language tools for building the `versatus-rust` quickstart kit
