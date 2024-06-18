@@ -208,6 +208,11 @@
         lasr_nightly_image =
           self.nixosConfigurations.lasr_nightly.config.system.build.digitalOceanImage;
 
+        # Spin up a virtual machine with the lasr_nightly_image options
+        # Useful for quickly debugging or testing changes locally
+        lasr_nightly_vm =
+          self.nixosConfigurations.lasr_nightly_vm.config.system.build.vm;
+
         # lasr_cli = # this works on Linux only at the moment
         #   let
         #     archPrefix = builtins.elemAt (pkgs.lib.strings.split "-" system) 0;
@@ -363,6 +368,39 @@
 
             # Variant 2: Inject via overlay
             # TODO!
+          })
+        ];
+      };
+
+      nixosConfigurations.lasr_nightly_vm = let
+        system = flake-utils.lib.system.x86_64-linux;
+      in
+      nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [
+          ./deployments/lasr_node/common.nix
+          ./deployments/lasr_node/nightly/nightly-options.nix
+          ({ modulesPath, ... }: {
+            imports = [ (modulesPath + "/virtualisation/qemu-vm.nix") ];
+            
+            virtualisation.forwardPorts = [
+              { from = "host"; host.port = 2222; guest.port = 22; }
+            ];
+
+            users.users.root.hashedPassword = "";
+
+            services.openssh = {
+              enable = true;
+              settings.PermitRootLogin = "yes";
+              settings.PermitEmptyPasswords = "yes";
+            };
+            security.pam.services.sshd.allowNullPassword = true;
+
+            # Adding the LASR package:
+            # Variant 1: Inject via Flake
+            environment.systemPackages = [
+              self.packages.${system}.lasr_node
+            ];
           })
         ];
       };
