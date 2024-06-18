@@ -19,6 +19,30 @@ let
         --pd="http://127.0.0.1:2379"
   '';
 
+  # Creates the working directory, scripts & initializes the IPFS node.
+  setup-working-dir = pkgs.writeShellScriptBin "setup-working-dir.sh" ''
+    mkdir -p /app/bin
+    mkdir -p /app/tmp/kubo
+
+    cd /app
+    printf "${procfile.text}" > "${procfile.name}"
+    git clone https://github.com/versatus/lasr.git
+    cd /app/bin
+    printf "${start-ipfs.text}" > "${start-ipfs.name}"
+    printf "${start-lasr.text}" > "${start-lasr.name}"
+    printf "${start-overmind.text}" > "${start-overmind.name}"
+
+    for file in ./*; do
+      chmod +x "$file"
+    done
+
+    cd /app/tmp/kubo
+    export IPFS_PATH=/app/tmp/kubo
+    ipfs init
+    echo "Done"
+    exit 0
+  '';
+
   # Starts kubo IPFS daemon.
   start-ipfs = pkgs.writeTextFile {
     name = "start-ipfs.sh";
@@ -36,15 +60,14 @@ let
       PREFIX=/app/lasr
       cd $PREFIX
 
-      # TODO: Figure out a way to pass the secret key securely.
-      # SECRET_KEY= \
+      SECRET_KEY=d2a31d0cc7152019b30a8764733e19f14e4fb5f83a530cb011eaeaf1b4f5c882 \
       BLOCKS_PROCESSED_PATH="/app/blocks_processed.dat" \
       ETH_RPC_URL="https://u0anlnjcq5:xPYLI9OMwxRqJZqhfgEiKMeGdpVjGduGKmMCNBsu46Y@u0auvfalma-u0j1mdxq0w-rpc.us0-aws.kaleido.io/" \
       EO_CONTRACT_ADDRESS=0x563f0efeea703237b32ae7f66123b864f3e46a3c \
       COMPUTE_RPC_URL=ws://localhost:9125 \
       STORAGE_RPC_URL=ws://localhost:9126 \
       BATCH_INTERVAL=180 \
-      	/app/lasr/target/release/lasr_node
+      	lasr_node
     '';
     executable = true;
     destination = "/app/bin/start-lasr.sh";
@@ -85,10 +108,7 @@ in
   ] ++ [
     start-pd-server
     start-tikv-server
-    start-ipfs
-    start-lasr
-    start-overmind
-    procfile
+    setup-working-dir
   ];
 
   # Enable docker socket

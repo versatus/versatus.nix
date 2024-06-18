@@ -106,6 +106,13 @@
         cargoArtifacts = lasrDeps;
         cargoExtraArgs = "--locked --bin lasr_node";
       });
+      lasrCliDrv = craneLib.buildPackage (lasrArgs // {
+        pname = "lasr_cli";
+        version = "1";
+        doCheck = false;
+        cargoArtifacts = lasrDeps;
+        cargoExtraArgs = "--locked --bin lasr_cli";
+      });
     in
     {
       # TODO: enable checks
@@ -205,6 +212,8 @@
 
         lasr_node = lasrNodeDrv;
 
+        lasr_cli = lasrCliDrv;
+
         lasr_nightly_image =
           self.nixosConfigurations.lasr_nightly.config.system.build.digitalOceanImage;
 
@@ -213,7 +222,7 @@
         lasr_nightly_vm =
           self.nixosConfigurations.lasr_nightly_vm.config.system.build.vm;
 
-        # lasr_cli = # this works on Linux only at the moment
+        # lasr_cli_cross = # this works on Linux only at the moment
         #   let
         #     archPrefix = builtins.elemAt (pkgs.lib.strings.split "-" system) 0;
         #     target = "${archPrefix}-unknown-linux-musl";
@@ -364,6 +373,7 @@
             # Variant 1: Inject via Flake
             environment.systemPackages = [
               self.packages.${system}.lasr_node
+              self.packages.${system}.lasr_cli
             ];
 
             # Variant 2: Inject via overlay
@@ -400,7 +410,10 @@
             # Variant 1: Inject via Flake
             environment.systemPackages = [
               self.packages.${system}.lasr_node
+              self.packages.${system}.lasr_cli
             ];
+
+            nix.settings.experimental-features = ["nix-command" "flakes"];
           })
         ];
       };
