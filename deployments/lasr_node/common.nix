@@ -4,9 +4,9 @@ let
   pd-image = pkgs.dockerTools.pullImage {
     imageName = "pingcap/pd";
     imageDigest = "sha256:0e87d077d0fd92903e26a6ebeda633d6979380aac6fc76aa24c6a02d25a404f6";
-    sha256 = "sha256-vYz5zpWuFlOao8NCrfexfmF5+5kp4j0FDslRC1VSExU=";
+    sha256 = "sha256-xNPJrv8y6vjAPNvn9lAkghCfRGUDiBfRCUBsEYvb49Q=";
     finalImageTag = "latest";
-    finalImageName = "pd";
+    finalImageName = "pingcap/pd";
   };
   # Starts the placement driver server for TiKV.
   start-pd-server = pkgs.writeShellScriptBin "start-pd-server.sh" ''
@@ -22,9 +22,9 @@ let
   tikv-image = pkgs.dockerTools.pullImage {
     imageName = "pingcap/tikv";
     imageDigest = "sha256:e68889611930cc054acae5a46bee862c4078af246313b414c1e6c4671dceca63";
-    sha256 = "sha256-ZM+6nZKBnN9aUZ8g9aw+20hV3i1RpMSjEVNLz1OOf0E=";
+    sha256 = "sha256-udLF3mAuUU08QX2Tg/mma9uu0JdtdJuxK3R1bqdKjKk=";
     finalImageTag = "latest";
-    finalImageName = "tikv";
+    finalImageName = "pingcap/tikv";
   };
   # Starts the TiKV server.
   start-tikv-server = pkgs.writeShellScriptBin "start-tikv-server.sh" ''

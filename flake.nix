@@ -392,10 +392,13 @@
           ./deployments/lasr_node/nightly/nightly-options.nix
           ({ modulesPath, ... }: {
             imports = [ (modulesPath + "/virtualisation/qemu-vm.nix") ];
-            
+
+            # Ports are subject to change
+            # Disk size may be increased as needed
             virtualisation.forwardPorts = [
               { from = "host"; host.port = 2222; guest.port = 22; }
             ];
+            virtualisation.diskSize = 2048;
 
             users.users.root.hashedPassword = "";
 
