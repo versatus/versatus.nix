@@ -123,10 +123,10 @@ in
         extraOptions = [
           "--network=host"
         ];
-        cmd = [ 
+        cmd = [
           "--data-dir=/pd1"
-          "--client-urls=http://0.0.0.0:2379" 
-          "--peer-urls=http://0.0.0.0:2380" 
+          "--client-urls=http://0.0.0.0:2379"
+          "--peer-urls=http://0.0.0.0:2380"
           "--advertise-client-urls=http://0.0.0.0:2379"
           "--advertise-peer-urls=http://0.0.0.0:2380"
         ];
