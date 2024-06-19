@@ -398,7 +398,10 @@
             virtualisation.forwardPorts = [
               { from = "host"; host.port = 2222; guest.port = 22; }
             ];
-            virtualisation.diskSize = 2048;
+            virtualisation = {
+              diskSize = 2048;
+              memorySize = 4096;
+            };
 
             users.users.root.hashedPassword = "";
 
