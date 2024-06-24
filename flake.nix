@@ -37,7 +37,6 @@
   };
 
   outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
-    # TODO: Define supported systems
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
       inherit (pkgs) lib;
@@ -205,9 +204,53 @@
         # });
       };
 
-      packages = rec {
-        default = versa;
+      packages = let
+        # The linux virtual machine system architecture, derived from the host's environment
+        # Example: aarch64-darwin -> aarch64-linux
+        deriveGuestPlatform = builtins.replaceStrings [ "darwin" ] [ "linux" ] pkgs.stdenv.hostPlatform.system;
+        # Build packages for the linux variant of the host architecture, but preserve the host's
+        # version of nixpkgs to build the virtual machine with. This way, building and running a
+        # linux virtual environment works for all supported system architectures.
+        lasrGuestVM = nixpkgs.lib.nixosSystem {
+          system = deriveGuestPlatform;
+          modules = [
+            ./deployments/lasr_node/common.nix
+            ./deployments/lasr_node/nightly/nightly-options.nix
+            ({ modulesPath, pkgs, ... }: {
+              imports = [ (modulesPath + "/virtualisation/qemu-vm.nix") ];
 
+              virtualisation = {
+                # Ports are subject to change
+                forwardPorts = [
+                  { from = "host"; host.port = 2222; guest.port = 22; }
+                ];
+                # Disk size & RAM may be increased as needed
+                diskSize = 2048;
+                memorySize = 4096;
+                # The host's version of nixpkgs used to build the VM
+                vmVariant.virtualisation.host.pkgs = pkgs;
+              };
+
+              users.users.root.hashedPassword = "";
+
+              services.openssh = {
+                enable = true;
+                settings.PermitRootLogin = "yes";
+                settings.PermitEmptyPasswords = "yes";
+              };
+              security.pam.services.sshd.allowNullPassword = true;
+
+              # Adding the LASR packages:
+              environment.systemPackages = [
+                self.packages.${system}.lasr_node
+                self.packages.${system}.lasr_cli
+              ];
+
+              nix.settings.experimental-features = ["nix-command" "flakes"];
+            })
+          ];
+        };
+      in {
         versa = versaNodeDrv;
 
         lasr_node = lasrNodeDrv;
@@ -219,8 +262,7 @@
 
         # Spin up a virtual machine with the lasr_nightly_image options
         # Useful for quickly debugging or testing changes locally
-        lasr_nightly_vm =
-          self.nixosConfigurations.lasr_nightly_vm.config.system.build.vm;
+        lasr_vm = lasrGuestVM.config.system.build.vm;
 
         # lasr_cli_cross = # this works on Linux only at the moment
         #   let
@@ -369,57 +411,11 @@
           ({ modulesPath, ... }: {
             imports = [ ./deployments/digital-ocean/digital-ocean-image.nix ];
 
-            # Adding the LASR package:
-            # Variant 1: Inject via Flake
+            # Adding the LASR packages:
             environment.systemPackages = [
               self.packages.${system}.lasr_node
               self.packages.${system}.lasr_cli
             ];
-
-            # Variant 2: Inject via overlay
-            # TODO!
-          })
-        ];
-      };
-
-      nixosConfigurations.lasr_nightly_vm = let
-        system = flake-utils.lib.system.x86_64-linux;
-      in
-      nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = [
-          ./deployments/lasr_node/common.nix
-          ./deployments/lasr_node/nightly/nightly-options.nix
-          ({ modulesPath, ... }: {
-            imports = [ (modulesPath + "/virtualisation/qemu-vm.nix") ];
-
-            # Ports are subject to change
-            # Disk size may be increased as needed
-            virtualisation.forwardPorts = [
-              { from = "host"; host.port = 2222; guest.port = 22; }
-            ];
-            virtualisation = {
-              diskSize = 2048;
-              memorySize = 4096;
-            };
-
-            users.users.root.hashedPassword = "";
-
-            services.openssh = {
-              enable = true;
-              settings.PermitRootLogin = "yes";
-              settings.PermitEmptyPasswords = "yes";
-            };
-            security.pam.services.sshd.allowNullPassword = true;
-
-            # Adding the LASR package:
-            # Variant 1: Inject via Flake
-            environment.systemPackages = [
-              self.packages.${system}.lasr_node
-              self.packages.${system}.lasr_cli
-            ];
-
-            nix.settings.experimental-features = ["nix-command" "flakes"];
           })
         ];
       };
