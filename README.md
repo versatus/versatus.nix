@@ -7,11 +7,19 @@ and [NixOS images & infrastructure for deploying Versatus services](./deployment
 ## Prerequisites
 
 Nix is a package manager with a focus on reproducibility and reliability.
-To get started, choose an installation type at https://nixos.org/download.
+To get started, choose an installation type at https://nixos.org/download. MacOS users, please read on.
+
+**For MacOS users**, the graphical installer made available by Determinate Systems has some advantages and is recommended over the official installer, which are explained and can be found here: https://determinate.systems/posts/graphical-nix-installer.
+
+Additionally, MacOS users may want to enable the `nix-darwin` module features in order to run linux virtual machines locally, otherwise this step may be skipped.
+There are two resources we recommend for getting started with `nix-darwin` which should be followed in this order:
+1. [nix-darwin setup](https://nixcademy.com/2024/01/15/nix-on-macos/#step-2-going-declarative-with-nix-darwin) 
+2. [nix-darwin linux builder](https://nixcademy.com/2024/02/12/macos-linux-builder/#the-nix-darwin-option)
 
 ### Nixpkgs
 
 For the Nix package manager on non-NixOS distributions, add the following to `/etc/nix/nix.conf`:
+> Note: If you used the Determinate Systems Nix installer, these settings are enabled by default.
 ```
 experimental-features = nix-command flakes
 ```
@@ -23,7 +31,7 @@ For the Nix operating system, add the following to `/etc/nixos/configuration.nix
 nix.settings.experimental-features = [ "nix-command" "flakes" ];
 ```
 
-## Quick Start
+## Developer Quick Start
 
 First, ensure your system is listed under [Supported Systems](#supported-systems).
 
@@ -38,6 +46,7 @@ nix develop .#<development-shell>
 - x86_64-darwin
 - aarch64-linux
 - aarch64-darwin
+> Note: The Determinate Systems Nix installer also supports WSL.
 
 ### Development Shells
 
