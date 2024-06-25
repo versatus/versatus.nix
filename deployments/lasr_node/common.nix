@@ -1,6 +1,6 @@
 { pkgs, ... }:
 let
-  system = builtins.replaceStrings [ "darwin" ] [ "linux" ] pkgs.stdenv.hostPlatform.system;
+  system = pkgs.stdenv.hostPlatform.system;
   # Pull the PD server image from dockerhub
   pd-image = let
     # TODO: Figure out how to automatically generate this.
