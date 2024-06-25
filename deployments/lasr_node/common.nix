@@ -1,10 +1,13 @@
 { pkgs, ... }:
 let
   # Pull the PD server image from dockerhub
-  pd-image = pkgs.dockerTools.pullImage {
+  pd-image = let
+    digest = "sha256:0e87d077d0fd92903e26a6ebeda633d6979380aac6fc76aa24c6a02d25a404f6";
+  in
+  pkgs.dockerTools.pullImage {
     imageName = "pingcap/pd";
-    imageDigest = "sha256:0e87d077d0fd92903e26a6ebeda633d6979380aac6fc76aa24c6a02d25a404f6";
-    sha256 = "sha256-+IBB5p1M8g3fLjHbF90vSSAoKUidl5cdkpTulkzlMAc=";
+    imageDigest = digest;
+    sha256 = builtins.hashString "sha256" digest;
     finalImageTag = "latest";
     finalImageName = "pingcap/pd";
   };
@@ -19,10 +22,13 @@ let
         --advertise-peer-urls="http://0.0.0.0:2380"
   '';
   # Pull the TiKV server image from dockerhub
-  tikv-image = pkgs.dockerTools.pullImage {
+  tikv-image = let
+    digest = "sha256:e68889611930cc054acae5a46bee862c4078af246313b414c1e6c4671dceca63";
+  in
+  pkgs.dockerTools.pullImage {
     imageName = "pingcap/tikv";
-    imageDigest = "sha256:e68889611930cc054acae5a46bee862c4078af246313b414c1e6c4671dceca63";
-    sha256 = "sha256-JbogHq9FLfm7x08xkwiDF0+YyUKRXF34vHty+ZxIZh0=";
+    imageDigest = digest;
+    sha256 = builtins.hashString "sha256" digest;
     finalImageTag = "latest";
     finalImageName = "pingcap/tikv";
   };
