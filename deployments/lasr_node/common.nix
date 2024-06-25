@@ -43,6 +43,10 @@ let
     cd /app
     printf "${procfile.text}" > "${procfile.name}"
     git clone https://github.com/versatus/lasr.git
+    # TODO: handle secret key between boots, possibly by adding
+    # it to `bashrc`.
+    export SECRET_KEY=$(lasr_cli wallet new | jq '.secret_key')
+
     cd /app/bin
     printf "${start-ipfs.text}" > "${start-ipfs.name}"
     printf "${start-lasr.text}" > "${start-lasr.name}"
@@ -69,6 +73,7 @@ let
     destination = "/app/bin/start-ipfs.sh";
   };
 
+  # TODO: Move these env vars from this script, they should go wherever $SECRET_KEY goes.
   # Starts the lasr_node from the release build.
   start-lasr = pkgs.writeTextFile {
     name = "start-lasr.sh";
@@ -76,7 +81,6 @@ let
       PREFIX=/app/lasr
       cd $PREFIX
 
-      SECRET_KEY=d2a31d0cc7152019b30a8764733e19f14e4fb5f83a530cb011eaeaf1b4f5c882 \
       BLOCKS_PROCESSED_PATH="/app/blocks_processed.dat" \
       ETH_RPC_URL="https://u0anlnjcq5:xPYLI9OMwxRqJZqhfgEiKMeGdpVjGduGKmMCNBsu46Y@u0auvfalma-u0j1mdxq0w-rpc.us0-aws.kaleido.io/" \
       EO_CONTRACT_ADDRESS=0x563f0efeea703237b32ae7f66123b864f3e46a3c \
@@ -118,6 +122,7 @@ in
     git
     grpcurl
     gvisor
+    jq
     kubo
     overmind
     tmux
