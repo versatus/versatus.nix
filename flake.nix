@@ -42,7 +42,7 @@
       inherit (pkgs) lib;
 
       # Language toolchains
-      rustToolchain = pkgs.callPackage ./dev/rust-toolchain.nix { inherit fenix; inherit versatus; };
+      rustToolchain = pkgs.callPackage ./dev/rust-toolchain.nix { inherit fenix versatus; };
       haskellToolchain = pkgs.callPackage ./dev/haskell-toolchain.nix pkgs;
 
       # Overrides the default crane rust-toolchain with fenix.
@@ -114,11 +114,7 @@
       });
     in
     {
-      # TODO: enable checks
-      # TODO: see if these checks can be rolled back into `self.checks`
-      # then inherit the relevant packages into the `devShell`s
-      versaNodeChecks = {
-        # Build the crates as part of `nix flake check` for convenience
+      checks = {
         versaNodeBuild = versaNodeDrv;
 
         # Run clippy (and deny all warnings) on the crate source,
@@ -141,78 +137,23 @@
           src = versaSrc;
         };
 
-        # Audit dependencies
-        # my-crate-audit = craneLib.cargoAudit {
-        #   inherit src advisory-db;
-        # };
-
-        # # Audit licenses
-        # my-crate-deny = craneLib.cargoDeny {
-        #   inherit src;
-        # };
-
-        # Run tests with cargo-nextest
-        # Consider setting `doCheck = false` on `my-crate` if you do not want
-        # the tests to run twice
-        # my-crate-nextest = craneLib.cargoNextest (commonArgs // {
-        #   inherit cargoArtifacts;
-        #   partitions = 1;
-        #   partitionType = "count";
-        # });
-      };
-      lasrNodeChecks = {
-        # Build the crates as part of `nix flake check` for convenience
         lasrNodeBuild = lasrNodeDrv;
-
-        # Run clippy (and deny all warnings) on the crate source,
-        # again, resuing the dependency artifacts from above.
-        #
-        # Note that this is done as a separate derivation so that
-        # we can block the CI if there are issues here, but not
-        # prevent downstream consumers from building our crate by itself.
-        # lasr-node-clippy = craneLib.cargoClippy (lasrArgs // {
-        #   cargoArtifacts = lasrDeps;
-        #   cargoClippyExtraArgs = "--all-targets -- --deny warnings";
-        # });
 
         lasr-node-doc = craneLib.cargoDoc (lasrArgs // {
           cargoArtifacts = lasrDeps;
         });
-
-        # Check formatting
-        # lasr-node-fmt = craneLib.cargoFmt {
-        #   src = lasrSrc;
-        # };
-
-        # Audit dependencies
-        # my-crate-audit = craneLib.cargoAudit {
-        #   inherit src advisory-db;
-        # };
-
-        # # Audit licenses
-        # my-crate-deny = craneLib.cargoDeny {
-        #   inherit src;
-        # };
-
-        # Run tests with cargo-nextest
-        # Consider setting `doCheck = false` on `my-crate` if you do not want
-        # the tests to run twice
-        # my-crate-nextest = craneLib.cargoNextest (commonArgs // {
-        #   inherit cargoArtifacts;
-        #   partitions = 1;
-        #   partitionType = "count";
-        # });
       };
-
+      
       packages = let
+        hostPkgs = pkgs;
         # The linux virtual machine system architecture, derived from the host's environment
         # Example: aarch64-darwin -> aarch64-linux
-        deriveGuestPlatform = builtins.replaceStrings [ "darwin" ] [ "linux" ] pkgs.stdenv.hostPlatform.system;
+        guest_system = builtins.replaceStrings [ "darwin" ] [ "linux" ] pkgs.stdenv.hostPlatform.system;
         # Build packages for the linux variant of the host architecture, but preserve the host's
         # version of nixpkgs to build the virtual machine with. This way, building and running a
         # linux virtual environment works for all supported system architectures.
         lasrGuestVM = nixpkgs.lib.nixosSystem {
-          system = deriveGuestPlatform;
+          system = null;
           modules = [
             ./deployments/lasr_node/common.nix
             ./deployments/lasr_node/nightly/nightly-options.nix
@@ -228,8 +169,10 @@
                 diskSize = 2048;
                 memorySize = 4096;
                 # The host's version of nixpkgs used to build the VM
-                vmVariant.virtualisation.host.pkgs = pkgs;
+                host.pkgs = hostPkgs;
               };
+
+              nixpkgs.hostPlatform = guest_system;
 
               users.users.root.hashedPassword = "";
 
@@ -242,8 +185,8 @@
 
               # Adding the LASR packages:
               environment.systemPackages = [
-                self.packages.${system}.lasr_node
-                self.packages.${system}.lasr_cli
+                self.packages.${guest_system}.lasr_node
+                self.packages.${guest_system}.lasr_cli
               ];
 
               nix.settings.experimental-features = ["nix-command" "flakes"];
@@ -365,13 +308,15 @@
         # Developer environments for Versatus repos
         protocol-dev = craneLib.devShell {
           # Inherit inputs from checks.
-          checks = self.versaNodeChecks.${system};
+          checks = { inherit (self.checks.${system}) versaNodeBuild; };
           # Explicit rebinding since the environment args aren't
           # inherited from `checks` like the packages are.
           LIBCLANG_PATH = protocolArgs.LIBCLANG_PATH;
           ROCKSDB_LIB_DIR = protocolArgs.ROCKSDB_LIB_DIR;
         };
-        lasr-dev = craneLib.devShell { checks = self.lasrNodeChecks.${system}; };
+        lasr-dev = craneLib.devShell {
+          checks = { inherit (self.checks.${system}) lasrNodeBuild; };
+        };
         nix-dev = pkgs.mkShell {
           buildInputs = with pkgs; [
             nil

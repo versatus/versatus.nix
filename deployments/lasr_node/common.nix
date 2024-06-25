@@ -3,16 +3,15 @@ let
   system = pkgs.stdenv.hostPlatform.system;
   # Pull the PD server image from dockerhub
   pd-image = let
-    # TODO: Figure out how to automatically generate this.
-    sha =
-      if system == "aarch64-linux" then "sha256-+IBB5p1M8g3fLjHbF90vSSAoKUidl5cdkpTulkzlMAc="
-      else if system == "x86_64-linux" then "sha256-xNPJrv8y6vjAPNvn9lAkghCfRGUDiBfRCUBsEYvb49Q="
-      else builtins.throw "Unsupported platform, must either be arm64 or amd64 Linux";
+    platformSha256 = {
+      "aarch64-linux" = "sha256-+IBB5p1M8g3fLjHbF90vSSAoKUidl5cdkpTulkzlMAc=";
+      "x86_64-linux" = "sha256-xNPJrv8y6vjAPNvn9lAkghCfRGUDiBfRCUBsEYvb49Q=";
+    }."${system}" or (builtins.throw "Unsupported platform, must either be arm64 or amd64 Linux: found ${system}");
   in
   pkgs.dockerTools.pullImage {
     imageName = "pingcap/pd";
     imageDigest = "sha256:0e87d077d0fd92903e26a6ebeda633d6979380aac6fc76aa24c6a02d25a404f6";
-    sha256 = sha;
+    sha256 = platformSha256;
     finalImageTag = "latest";
     finalImageName = "pingcap/pd";
   };
@@ -28,16 +27,15 @@ let
   '';
   # Pull the TiKV server image from dockerhub
   tikv-image = let
-    # TODO: Figure out how to automatically generate this.
-    sha =
-      if system == "aarch64-linux" then "sha256-JbogHq9FLfm7x08xkwiDF0+YyUKRXF34vHty+ZxIZh0="
-      else if system == "x86_64-linux" then "sha256-udLF3mAuUU08QX2Tg/mma9uu0JdtdJuxK3R1bqdKjKk="
-      else builtins.throw "Unsupported platform, must either be arm64 or amd64 Linux";
+    platformSha256 = {
+      "aarch64-linux" = "sha256-JbogHq9FLfm7x08xkwiDF0+YyUKRXF34vHty+ZxIZh0=";
+      "x86_64-linux" = "sha256-udLF3mAuUU08QX2Tg/mma9uu0JdtdJuxK3R1bqdKjKk=";
+    }.${system} or (builtins.throw "Unsupported platform, must either be arm64 or amd64 Linux: found ${system}");
   in
   pkgs.dockerTools.pullImage {
     imageName = "pingcap/tikv";
     imageDigest = "sha256:e68889611930cc054acae5a46bee862c4078af246313b414c1e6c4671dceca63";
-    sha256 = sha;
+    sha256 = platformSha256;
     finalImageTag = "latest";
     finalImageName = "pingcap/tikv";
   };
@@ -90,15 +88,19 @@ let
     compute_rpc_url=ws://localhost:9125 
     storage_rpc_url=ws://localhost:9126
     batch_interval=180
-    echo "set -o noclobber" >> /etc/profile
-    echo "export SECRET_KEY=$secret_key" >> /etc/profile
-    echo "export BLOCKS_PROCESSED_PATH=$block_path" >> /etc/profile
-    echo "export ETH_RPC_URL=$eth_rpc_url" >> /etc/profile
-    echo "export EO_CONTRACT_ADDRESS=$eo_contract" >> /etc/profile
-    echo "export COMPUTE_RPC_URL=$compute_rpc_url" >> /etc/profile
-    echo "export STORAGE_RPC_URL=$storage_rpc_url" >> /etc/profile
-    echo "export BATCH_INTERVAL=$batch_interval" >> /etc/profile
-    source /etc/profile
+    echo "set -o noclobber" > ~/.bashrc
+    echo "export SECRET_KEY=$secret_key" >> ~/.bashrc
+    echo "export BLOCKS_PROCESSED_PATH=$block_path" >> ~/.bashrc
+    echo "export ETH_RPC_URL=$eth_rpc_url" >> ~/.bashrc
+    echo "export EO_CONTRACT_ADDRESS=$eo_contract" >> ~/.bashrc
+    echo "export COMPUTE_RPC_URL=$compute_rpc_url" >> ~/.bashrc
+    echo "export STORAGE_RPC_URL=$storage_rpc_url" >> ~/.bashrc
+    echo "export BATCH_INTERVAL=$batch_interval" >> ~/.bashrc
+    echo "[[ \$- == *i* && -f \"\$HOME/.bashrc\" ]] && source \"\$HOME/.bashrc\"" > ~/.bash_profile
+
+    source ~/.bashrc
+    echo "Done"
+    exit 0
   '';
 
   # Starts kubo IPFS daemon.
