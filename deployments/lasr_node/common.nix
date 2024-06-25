@@ -52,15 +52,17 @@ let
 
   # Creates the working directory, scripts & initializes the IPFS node.
   setup-working-dir = pkgs.writeShellScriptBin "setup-working-dir.sh" ''
+    if [ -e "/app" ]; then
+      echo "Working directory already exists."
+      exit 0
+    fi
+
     mkdir -p /app/bin
     mkdir -p /app/tmp/kubo
 
     cd /app
     printf "${procfile.text}" > "${procfile.name}"
     git clone https://github.com/versatus/lasr.git
-    # TODO: handle secret key between boots, possibly by adding
-    # it to `bashrc`.
-    export SECRET_KEY=$(lasr_cli wallet new | jq '.secret_key')
 
     cd /app/bin
     printf "${start-ipfs.text}" > "${start-ipfs.name}"
@@ -74,8 +76,29 @@ let
     cd /app/tmp/kubo
     export IPFS_PATH=/app/tmp/kubo
     ipfs init
+
     echo "Done"
     exit 0
+  '';
+
+  # Initializes lasr_node environment variables and persists them between system boots.
+  init-env = pkgs.writeShellScriptBin "init-env.sh" ''
+    secret_key=$(lasr_cli wallet new | jq '.secret_key')
+    block_path="/app/blocks_processed.dat"
+    eth_rpc_url="https://u0anlnjcq5:xPYLI9OMwxRqJZqhfgEiKMeGdpVjGduGKmMCNBsu46Y@u0auvfalma-u0j1mdxq0w-rpc.us0-aws.kaleido.io/" 
+    eo_contract=0x563f0efeea703237b32ae7f66123b864f3e46a3c
+    compute_rpc_url=ws://localhost:9125 
+    storage_rpc_url=ws://localhost:9126
+    batch_interval=180
+    echo "set -o noclobber" >> /etc/profile
+    echo "export SECRET_KEY=$secret_key" >> /etc/profile
+    echo "export BLOCKS_PROCESSED_PATH=$block_path" >> /etc/profile
+    echo "export ETH_RPC_URL=$eth_rpc_url" >> /etc/profile
+    echo "export EO_CONTRACT_ADDRESS=$eo_contract" >> /etc/profile
+    echo "export COMPUTE_RPC_URL=$compute_rpc_url" >> /etc/profile
+    echo "export STORAGE_RPC_URL=$storage_rpc_url" >> /etc/profile
+    echo "export BATCH_INTERVAL=$batch_interval" >> /etc/profile
+    source /etc/profile
   '';
 
   # Starts kubo IPFS daemon.
@@ -88,7 +111,7 @@ let
     destination = "/app/bin/start-ipfs.sh";
   };
 
-  # TODO: Move these env vars from this script, they should go wherever $SECRET_KEY goes.
+  # TODO: Remove this and use either the cargo target bin, or nix bin directly.
   # Starts the lasr_node from the release build.
   start-lasr = pkgs.writeTextFile {
     name = "start-lasr.sh";
@@ -96,13 +119,7 @@ let
       PREFIX=/app/lasr
       cd $PREFIX
 
-      BLOCKS_PROCESSED_PATH="/app/blocks_processed.dat" \
-      ETH_RPC_URL="https://u0anlnjcq5:xPYLI9OMwxRqJZqhfgEiKMeGdpVjGduGKmMCNBsu46Y@u0auvfalma-u0j1mdxq0w-rpc.us0-aws.kaleido.io/" \
-      EO_CONTRACT_ADDRESS=0x563f0efeea703237b32ae7f66123b864f3e46a3c \
-      COMPUTE_RPC_URL=ws://localhost:9125 \
-      STORAGE_RPC_URL=ws://localhost:9126 \
-      BATCH_INTERVAL=180 \
-      	lasr_node
+      lasr_node
     '';
     executable = true;
     destination = "/app/bin/start-lasr.sh";
@@ -110,7 +127,7 @@ let
 
   # Main process script. Re/starts the node and dependencies.
   start-overmind = pkgs.writeTextFile {
-    name = "start-overmind.sh"; 
+    name = "start-overmind.sh";
     text = ''
       OVERMIND_CAN_DIE=reset overmind start -D -N /app/Procfile
     '';
@@ -142,6 +159,7 @@ in
     overmind
     tmux
   ] ++ [
+    init-env
     start-pd-server
     start-tikv-server
     setup-working-dir
