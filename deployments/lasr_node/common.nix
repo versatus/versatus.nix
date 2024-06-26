@@ -81,6 +81,11 @@ let
 
   # Initializes lasr_node environment variables and persists them between system boots.
   init-env = pkgs.writeShellScriptBin "init-env.sh" ''
+    if [ -e "\$HOME/.bashrc" ]; then
+      echo "Environment already initialized."
+      exit 0
+    fi
+
     secret_key=$(lasr_cli wallet new | jq '.secret_key')
     block_path="/app/blocks_processed.dat"
     eth_rpc_url="https://u0anlnjcq5:xPYLI9OMwxRqJZqhfgEiKMeGdpVjGduGKmMCNBsu46Y@u0auvfalma-u0j1mdxq0w-rpc.us0-aws.kaleido.io/" 
@@ -203,6 +208,67 @@ in
         ];
       };
     };
+  };
+
+  # Node services that will run on server start
+  systemd.user.services = {
+    setup-working-dir = {
+      description = "Creates the working directory, scripts & initializes the IPFS node.";
+      script = ''
+        if [ -e "/app" ]; then
+          echo "Working directory already exists."
+          exit 0
+        fi
+
+        mkdir -p /app/bin
+        mkdir -p /app/tmp/kubo
+
+        cd /app
+        printf "${procfile.text}" > "${procfile.name}"
+        "${pkgs.git}"/bin/git clone https://github.com/versatus/lasr.git
+
+        cd /app/bin
+        printf "${start-ipfs.text}" > "${start-ipfs.name}"
+        printf "${start-lasr.text}" > "${start-lasr.name}"
+        printf "${start-overmind.text}" > "${start-overmind.name}"
+
+        for file in ./*; do
+          chmod +x "$file"
+        done
+
+        cd /app/tmp/kubo
+        export IPFS_PATH=/app/tmp/kubo
+        "${pkgs.kubo}/bin/ipfs" init
+      '';
+      wantedBy = [ "default.target" ];
+    };
+    # init-env = {
+    #   description = "Initializes lasr_node environment variables and persists them between system boots.";
+    #   script = ''
+    #     if [ -f "\$HOME/.bashrc" ]; then
+    #       echo "Environment already initialized."
+    #       exit 0
+    #     fi
+
+    #     secret_key=$(${lasr_cli}/bin/lasr_cli wallet new | ${pkgs.jq}/bin/jq '.secret_key')
+    #     block_path="/app/blocks_processed.dat"
+    #     eth_rpc_url="https://u0anlnjcq5:xPYLI9OMwxRqJZqhfgEiKMeGdpVjGduGKmMCNBsu46Y@u0auvfalma-u0j1mdxq0w-rpc.us0-aws.kaleido.io/" 
+    #     eo_contract=0x563f0efeea703237b32ae7f66123b864f3e46a3c
+    #     compute_rpc_url=ws://localhost:9125 
+    #     storage_rpc_url=ws://localhost:9126
+    #     batch_interval=180
+    #     echo "set -o noclobber" > ~/.bashrc
+    #     echo "export SECRET_KEY=$secret_key" >> ~/.bashrc
+    #     echo "export BLOCKS_PROCESSED_PATH=$block_path" >> ~/.bashrc
+    #     echo "export ETH_RPC_URL=$eth_rpc_url" >> ~/.bashrc
+    #     echo "export EO_CONTRACT_ADDRESS=$eo_contract" >> ~/.bashrc
+    #     echo "export COMPUTE_RPC_URL=$compute_rpc_url" >> ~/.bashrc
+    #     echo "export STORAGE_RPC_URL=$storage_rpc_url" >> ~/.bashrc
+    #     echo "export BATCH_INTERVAL=$batch_interval" >> ~/.bashrc
+    #     echo "[[ \$- == *i* && -f \"\$HOME/.bashrc\" ]] && source \"\$HOME/.bashrc\"" > ~/.bash_profile
+    #   '';
+    #   wantedBy = [ "default.target" ];
+    # };
   };
 
   # Before changing, read this first:
