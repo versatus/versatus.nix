@@ -177,7 +177,11 @@ in
     tmux
   ] ++ [
     init-env
+    procfile
     setup-working-dir
+    start-ipfs
+    start-lasr
+    start-overmind
     start-pd-server
     start-tikv-server
   ];
@@ -222,36 +226,6 @@ in
 
   # Node services that will run on server start
   systemd.user.services = {
-    setup-working-dir = {
-      description = "Creates the working directory, scripts & initializes the IPFS node.";
-      script = ''
-        if [ -e "/app" ]; then
-          echo "Working directory already exists."
-          exit 0
-        fi
-
-        mkdir -p /app/bin
-        mkdir -p /app/tmp/kubo
-
-        cd /app
-        printf "${procfile.text}" > "${procfile.name}"
-        "${pkgs.git}"/bin/git clone https://github.com/versatus/lasr.git
-
-        cd /app/bin
-        printf "${start-ipfs.text}" > "${start-ipfs.name}"
-        printf "${start-lasr.text}" > "${start-lasr.name}"
-        printf "${start-overmind.text}" > "${start-overmind.name}"
-
-        for file in ./*; do
-          chmod +x "$file"
-        done
-
-        cd /app/tmp/kubo
-        export IPFS_PATH=/app/tmp/kubo
-        "${pkgs.kubo}/bin/ipfs" init
-      '';
-      wantedBy = [ "node-start.service" ];
-    };
     init-env = {
       description = "Initializes lasr_node environment variables and persists them between system boots.";
       script = ''
@@ -276,18 +250,62 @@ in
         echo "export STORAGE_RPC_URL=$storage_rpc_url" >> ~/.bashrc
         echo "export BATCH_INTERVAL=$batch_interval" >> ~/.bashrc
         echo "[[ \$- == *i* && -f \"\$HOME/.bashrc\" ]] && source \"\$HOME/.bashrc\"" > ~/.bash_profile
+        echo "Successfully initialized lasr_node environment."
+      '';
+      wantedBy = [ "default.target" ];
+    };
+    ipfs-start = {
+      description = "Setup and start IPFS daemon.";
+      preStart = ''
+        if [ ! -e "/app/tmp/kubo" ]; then
+          mkdir -p /app/tmp/kubo
+        fi
+        cd /app/tmp/kubo
+        export IPFS_PATH=/app/tmp/kubo
+        "${pkgs.kubo}/bin/ipfs" init
+        echo "Initialized IPFS."
+      '';
+      script = ''
+        sleep 2
+        IPFS_PATH=/app/tmp/kubo "${pkgs.kubo}/bin/ipfs" daemon
       '';
       wantedBy = [ "node-start.service" ];
     };
-    # TODO: fix this, it no worky ): 
     node-start = {
       description = "Start the lasr_node process.";
-      requires = [ "setup-working-dir.service" "init-env.service" ];
-      after = [ "setup-working-dir.service" "init-env.service" ];
+      after = [ "init-env.service" "ipfs-start.service" ];
+      preStart = ''
+        if [ ! -e "/app/bin" ]; then
+          echo "Setting up working directory.."
+          mkdir -p /app/bin
+
+          cd /app
+          printf "${procfile.text}" > "${procfile.name}"
+          "${pkgs.git}"/bin/git clone https://github.com/versatus/lasr.git
+
+          cd /app/bin
+          printf "${start-ipfs.text}" > "${start-ipfs.name}"
+          printf "${start-lasr.text}" > "${start-lasr.name}"
+          printf "${start-overmind.text}" > "${start-overmind.name}"
+
+          for file in ./*; do
+            chmod +x "$file"
+          done
+
+          echo "Working directory '/app' is ready."
+        else
+          echo "Working directory already exists."
+        fi
+      '';
       script = ''
-        .${start-overmind}/app/bin/start-overmind.sh
+        source "$HOME/.bashrc"
+        "${lasr_pkgs.lasr_node}/bin/lasr_node"
       '';
       wantedBy = [ "default.target" ];
+      serviceConfig = {
+        Restart = "always";
+        RestartSec = 5;
+      };
     };
   };
 
