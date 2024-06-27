@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lasr_pkgs, ... }:
 let
   system = pkgs.stdenv.hostPlatform.system;
   # Pull the PD server image from dockerhub
@@ -16,6 +16,8 @@ let
     finalImageName = "pingcap/pd";
   };
   # Starts the placement driver server for TiKV.
+  # NOTE: This is a global script, which is run by default and is only
+  # necessary in scenarios where the server does not start automatically.
   start-pd-server = pkgs.writeShellScriptBin "start-pd-server.sh" ''
     docker run -d --name pd-server --network host pingcap/pd:latest \
         --name="pd1" \
@@ -40,6 +42,8 @@ let
     finalImageName = "pingcap/tikv";
   };
   # Starts the TiKV server.
+  # NOTE: This is a global script, which is run by default and is only
+  # necessary in scenarios where the server does not start automatically.
   start-tikv-server = pkgs.writeShellScriptBin "start-tikv-server.sh" ''
     docker run -d --name tikv-server --network host pingcap/tikv:latest \
         --addr="127.0.0.1:20160" \
@@ -49,6 +53,8 @@ let
   '';
 
   # Creates the working directory, scripts & initializes the IPFS node.
+  # NOTE: This is a global script, which is run by default and is only
+  # necessary in scenarios where the systemd service fails.
   setup-working-dir = pkgs.writeShellScriptBin "setup-working-dir.sh" ''
     if [ -e "/app" ]; then
       echo "Working directory already exists."
@@ -78,8 +84,9 @@ let
     echo "Done"
     exit 0
   '';
-
   # Initializes lasr_node environment variables and persists them between system boots.
+  # NOTE: This is a global script, which is run by default and is only
+  # necessary in scenarios where the systemd service fails.
   init-env = pkgs.writeShellScriptBin "init-env.sh" ''
     if [ -e "\$HOME/.bashrc" ]; then
       echo "Environment already initialized."
@@ -117,21 +124,24 @@ let
     executable = true;
     destination = "/app/bin/start-ipfs.sh";
   };
-
-  # TODO: Remove this and use either the cargo target bin, or nix bin directly.
-  # Starts the lasr_node from the release build.
+  # Starts the lasr_node from the release build specified by the nix flake.
   start-lasr = pkgs.writeTextFile {
     name = "start-lasr.sh";
     text = ''
       PREFIX=/app/lasr
       cd $PREFIX
 
+      # For local development:
+      # The default behaviour will use the binary specified by the nix flake.
+      # This is important because it retains the flake.lock versioning.
+      # If this is not important to you, exchange the call to lasr_node
+      # with the following:
+      # ./target/release/lasr_node
       lasr_node
     '';
     executable = true;
     destination = "/app/bin/start-lasr.sh";
   };
-
   # Main process script. Re/starts the node and dependencies.
   start-overmind = pkgs.writeTextFile {
     name = "start-overmind.sh";
@@ -167,9 +177,9 @@ in
     tmux
   ] ++ [
     init-env
+    setup-working-dir
     start-pd-server
     start-tikv-server
-    setup-working-dir
   ];
 
   # Enable docker socket
@@ -240,35 +250,45 @@ in
         export IPFS_PATH=/app/tmp/kubo
         "${pkgs.kubo}/bin/ipfs" init
       '';
+      wantedBy = [ "node-start.service" ];
+    };
+    init-env = {
+      description = "Initializes lasr_node environment variables and persists them between system boots.";
+      script = ''
+        if [ -f "\$HOME/.bashrc" ]; then
+          echo "Environment already initialized."
+          exit 0
+        fi
+
+        secret_key=$(${lasr_pkgs.lasr_cli}/bin/lasr_cli wallet new | ${pkgs.jq}/bin/jq '.secret_key')
+        block_path="/app/blocks_processed.dat"
+        eth_rpc_url="https://u0anlnjcq5:xPYLI9OMwxRqJZqhfgEiKMeGdpVjGduGKmMCNBsu46Y@u0auvfalma-u0j1mdxq0w-rpc.us0-aws.kaleido.io/" 
+        eo_contract=0x563f0efeea703237b32ae7f66123b864f3e46a3c
+        compute_rpc_url=ws://localhost:9125 
+        storage_rpc_url=ws://localhost:9126
+        batch_interval=180
+        echo "set -o noclobber" > ~/.bashrc
+        echo "export SECRET_KEY=$secret_key" >> ~/.bashrc
+        echo "export BLOCKS_PROCESSED_PATH=$block_path" >> ~/.bashrc
+        echo "export ETH_RPC_URL=$eth_rpc_url" >> ~/.bashrc
+        echo "export EO_CONTRACT_ADDRESS=$eo_contract" >> ~/.bashrc
+        echo "export COMPUTE_RPC_URL=$compute_rpc_url" >> ~/.bashrc
+        echo "export STORAGE_RPC_URL=$storage_rpc_url" >> ~/.bashrc
+        echo "export BATCH_INTERVAL=$batch_interval" >> ~/.bashrc
+        echo "[[ \$- == *i* && -f \"\$HOME/.bashrc\" ]] && source \"\$HOME/.bashrc\"" > ~/.bash_profile
+      '';
+      wantedBy = [ "node-start.service" ];
+    };
+    # TODO: fix this, it no worky ): 
+    node-start = {
+      description = "Start the lasr_node process.";
+      requires = [ "setup-working-dir.service" "init-env.service" ];
+      after = [ "setup-working-dir.service" "init-env.service" ];
+      script = ''
+        .${start-overmind}/app/bin/start-overmind.sh
+      '';
       wantedBy = [ "default.target" ];
     };
-    # init-env = {
-    #   description = "Initializes lasr_node environment variables and persists them between system boots.";
-    #   script = ''
-    #     if [ -f "\$HOME/.bashrc" ]; then
-    #       echo "Environment already initialized."
-    #       exit 0
-    #     fi
-
-    #     secret_key=$(${lasr_cli}/bin/lasr_cli wallet new | ${pkgs.jq}/bin/jq '.secret_key')
-    #     block_path="/app/blocks_processed.dat"
-    #     eth_rpc_url="https://u0anlnjcq5:xPYLI9OMwxRqJZqhfgEiKMeGdpVjGduGKmMCNBsu46Y@u0auvfalma-u0j1mdxq0w-rpc.us0-aws.kaleido.io/" 
-    #     eo_contract=0x563f0efeea703237b32ae7f66123b864f3e46a3c
-    #     compute_rpc_url=ws://localhost:9125 
-    #     storage_rpc_url=ws://localhost:9126
-    #     batch_interval=180
-    #     echo "set -o noclobber" > ~/.bashrc
-    #     echo "export SECRET_KEY=$secret_key" >> ~/.bashrc
-    #     echo "export BLOCKS_PROCESSED_PATH=$block_path" >> ~/.bashrc
-    #     echo "export ETH_RPC_URL=$eth_rpc_url" >> ~/.bashrc
-    #     echo "export EO_CONTRACT_ADDRESS=$eo_contract" >> ~/.bashrc
-    #     echo "export COMPUTE_RPC_URL=$compute_rpc_url" >> ~/.bashrc
-    #     echo "export STORAGE_RPC_URL=$storage_rpc_url" >> ~/.bashrc
-    #     echo "export BATCH_INTERVAL=$batch_interval" >> ~/.bashrc
-    #     echo "[[ \$- == *i* && -f \"\$HOME/.bashrc\" ]] && source \"\$HOME/.bashrc\"" > ~/.bash_profile
-    #   '';
-    #   wantedBy = [ "default.target" ];
-    # };
   };
 
   # Before changing, read this first:

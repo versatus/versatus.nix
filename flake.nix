@@ -149,6 +149,7 @@
         # The linux virtual machine system architecture, derived from the host's environment
         # Example: aarch64-darwin -> aarch64-linux
         guest_system = builtins.replaceStrings [ "darwin" ] [ "linux" ] pkgs.stdenv.hostPlatform.system;
+        guest_pkgs = self.packages.${guest_system};
         # Build packages for the linux variant of the host architecture, but preserve the host's
         # version of nixpkgs to build the virtual machine with. This way, building and running a
         # linux virtual environment works for all supported system architectures.
@@ -184,14 +185,20 @@
               security.pam.services.sshd.allowNullPassword = true;
 
               # Adding the LASR packages:
-              environment.systemPackages = [
-                self.packages.${guest_system}.lasr_node
-                self.packages.${guest_system}.lasr_cli
+              environment.systemPackages = with guest_pkgs; [
+                lasr_node
+                lasr_cli
               ];
 
               nix.settings.experimental-features = ["nix-command" "flakes"];
             })
           ];
+          specialArgs = {
+            lasr_pkgs = with guest_pkgs; {
+              lasr_node = lasr_node;
+              lasr_cli = lasr_cli;
+            };
+          };
         };
       in {
         versa = versaNodeDrv;
@@ -347,6 +354,7 @@
     }) // {
       nixosConfigurations.lasr_nightly = let
         system = flake-utils.lib.system.x86_64-linux;
+        nightly_pkgs = self.packages.${system};
       in
       nixpkgs.lib.nixosSystem {
         inherit system;
@@ -357,12 +365,18 @@
             imports = [ ./deployments/digital-ocean/digital-ocean-image.nix ];
 
             # Adding the LASR packages:
-            environment.systemPackages = [
-              self.packages.${system}.lasr_node
-              self.packages.${system}.lasr_cli
+            environment.systemPackages = with nightly_pkgs; [
+              lasr_node
+              lasr_cli
             ];
           })
         ];
+        specialArgs = {
+          lasr_pkgs = with nightly_pkgs; {
+            lasr_node = lasr_node;
+            lasr_cli = lasr_cli;
+          };
+        };
       };
     }; 
 }
