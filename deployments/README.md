@@ -16,6 +16,18 @@ servers with NixOS:
 4. A `systemd` startup script runs upon successful server start which deploys the `lasr_node`
 5. This process continues automatically, pulling the most recent changes from the `lasr` repository on a nightly and bi-weekly basis
 
+## Local Development
+It's possible to test your changes to a server locally by starting a NixOS virtual machine environment.
+
+### NixOS VM Linux
+Linux users have an easy time of this, and can simply `nix build .#<nixos-vm>`, then execute the resulting binary `./result/bin/<run-nixos-vm>`,
+assuming they already have a nix installation.
+
+### NixOS VM Darwin
+Darwin users worry not, there is a fairly straight-forward solution with `nix-darwin`. The setup for which is detailed in the root [README.md](../README.md).
+An example of a finalized `nix-darwin` flake, which enables the `linux-builder` functionality can be found at [nix-darwin-example](./nix-darwin).
+From this point, the steps for running the virtual environment are [the same as Linux](#nixos-vm-linux)! 🎉
+
 ## Rebuilding The NixOS Server
 **Be aware that changes to the server with these methods are semi-permanent at best. To add permanent changes please file
 an issue and pull request that closes said issue.**
