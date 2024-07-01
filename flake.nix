@@ -37,13 +37,12 @@
   };
 
   outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
-    # TODO: Define supported systems
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
       inherit (pkgs) lib;
 
       # Language toolchains
-      rustToolchain = pkgs.callPackage ./dev/rust-toolchain.nix { inherit fenix; inherit versatus; };
+      rustToolchain = pkgs.callPackage ./dev/rust-toolchain.nix { inherit fenix versatus; };
       haskellToolchain = pkgs.callPackage ./dev/haskell-toolchain.nix pkgs;
 
       # Overrides the default crane rust-toolchain with fenix.
@@ -106,13 +105,16 @@
         cargoArtifacts = lasrDeps;
         cargoExtraArgs = "--locked --bin lasr_node";
       });
+      lasrCliDrv = craneLib.buildPackage (lasrArgs // {
+        pname = "lasr_cli";
+        version = "1";
+        doCheck = false;
+        cargoArtifacts = lasrDeps;
+        cargoExtraArgs = "--locked --bin lasr_cli";
+      });
     in
     {
-      # TODO: enable checks
-      # TODO: see if these checks can be rolled back into `self.checks`
-      # then inherit the relevant packages into the `devShell`s
-      versaNodeChecks = {
-        # Build the crates as part of `nix flake check` for convenience
+      checks = {
         versaNodeBuild = versaNodeDrv;
 
         # Run clippy (and deny all warnings) on the crate source,
@@ -135,80 +137,84 @@
           src = versaSrc;
         };
 
-        # Audit dependencies
-        # my-crate-audit = craneLib.cargoAudit {
-        #   inherit src advisory-db;
-        # };
-
-        # # Audit licenses
-        # my-crate-deny = craneLib.cargoDeny {
-        #   inherit src;
-        # };
-
-        # Run tests with cargo-nextest
-        # Consider setting `doCheck = false` on `my-crate` if you do not want
-        # the tests to run twice
-        # my-crate-nextest = craneLib.cargoNextest (commonArgs // {
-        #   inherit cargoArtifacts;
-        #   partitions = 1;
-        #   partitionType = "count";
-        # });
-      };
-      lasrNodeChecks = {
-        # Build the crates as part of `nix flake check` for convenience
         lasrNodeBuild = lasrNodeDrv;
-
-        # Run clippy (and deny all warnings) on the crate source,
-        # again, resuing the dependency artifacts from above.
-        #
-        # Note that this is done as a separate derivation so that
-        # we can block the CI if there are issues here, but not
-        # prevent downstream consumers from building our crate by itself.
-        # lasr-node-clippy = craneLib.cargoClippy (lasrArgs // {
-        #   cargoArtifacts = lasrDeps;
-        #   cargoClippyExtraArgs = "--all-targets -- --deny warnings";
-        # });
 
         lasr-node-doc = craneLib.cargoDoc (lasrArgs // {
           cargoArtifacts = lasrDeps;
         });
-
-        # Check formatting
-        # lasr-node-fmt = craneLib.cargoFmt {
-        #   src = lasrSrc;
-        # };
-
-        # Audit dependencies
-        # my-crate-audit = craneLib.cargoAudit {
-        #   inherit src advisory-db;
-        # };
-
-        # # Audit licenses
-        # my-crate-deny = craneLib.cargoDeny {
-        #   inherit src;
-        # };
-
-        # Run tests with cargo-nextest
-        # Consider setting `doCheck = false` on `my-crate` if you do not want
-        # the tests to run twice
-        # my-crate-nextest = craneLib.cargoNextest (commonArgs // {
-        #   inherit cargoArtifacts;
-        #   partitions = 1;
-        #   partitionType = "count";
-        # });
       };
+      
+      packages = let
+        hostPkgs = pkgs;
+        # The linux virtual machine system architecture, derived from the host's environment
+        # Example: aarch64-darwin -> aarch64-linux
+        guest_system = builtins.replaceStrings [ "darwin" ] [ "linux" ] pkgs.stdenv.hostPlatform.system;
+        guest_pkgs = self.packages.${guest_system};
+        # Build packages for the linux variant of the host architecture, but preserve the host's
+        # version of nixpkgs to build the virtual machine with. This way, building and running a
+        # linux virtual environment works for all supported system architectures.
+        lasrGuestVM = nixpkgs.lib.nixosSystem {
+          system = null;
+          modules = [
+            ./deployments/lasr_node/common.nix
+            ./deployments/lasr_node/nightly/nightly-options.nix
+            ({ modulesPath, pkgs, ... }: {
+              imports = [ (modulesPath + "/virtualisation/qemu-vm.nix") ];
 
-      packages = rec {
-        default = versa;
+              virtualisation = {
+                # Ports are subject to change
+                forwardPorts = [
+                  { from = "host"; host.port = 2222; guest.port = 22; }
+                ];
+                # Disk size & RAM may be increased as needed
+                diskSize = 2048;
+                memorySize = 4096;
+                # The host's version of nixpkgs used to build the VM
+                host.pkgs = hostPkgs;
+              };
 
+              nixpkgs.hostPlatform = guest_system;
+
+              users.users.root.hashedPassword = "";
+
+              services.openssh = {
+                enable = true;
+                settings.PermitRootLogin = "yes";
+                settings.PermitEmptyPasswords = "yes";
+              };
+              security.pam.services.sshd.allowNullPassword = true;
+
+              # Adding the LASR packages:
+              environment.systemPackages = with guest_pkgs; [
+                lasr_node
+                lasr_cli
+              ];
+
+              nix.settings.experimental-features = ["nix-command" "flakes"];
+            })
+          ];
+          specialArgs = {
+            lasr_pkgs = with guest_pkgs; {
+              lasr_node = lasr_node;
+              lasr_cli = lasr_cli;
+            };
+          };
+        };
+      in {
         versa = versaNodeDrv;
 
         lasr_node = lasrNodeDrv;
 
+        lasr_cli = lasrCliDrv;
+
         lasr_nightly_image =
           self.nixosConfigurations.lasr_nightly.config.system.build.digitalOceanImage;
 
-        # lasr_cli = # this works on Linux only at the moment
+        # Spin up a virtual machine with the lasr_nightly_image options
+        # Useful for quickly debugging or testing changes locally
+        lasr_vm = lasrGuestVM.config.system.build.vm;
+
+        # lasr_cli_cross = # this works on Linux only at the moment
         #   let
         #     archPrefix = builtins.elemAt (pkgs.lib.strings.split "-" system) 0;
         #     target = "${archPrefix}-unknown-linux-musl";
@@ -309,13 +315,15 @@
         # Developer environments for Versatus repos
         protocol-dev = craneLib.devShell {
           # Inherit inputs from checks.
-          checks = self.versaNodeChecks.${system};
+          checks = { inherit (self.checks.${system}) versaNodeBuild; };
           # Explicit rebinding since the environment args aren't
           # inherited from `checks` like the packages are.
           LIBCLANG_PATH = protocolArgs.LIBCLANG_PATH;
           ROCKSDB_LIB_DIR = protocolArgs.ROCKSDB_LIB_DIR;
         };
-        lasr-dev = craneLib.devShell { checks = self.lasrNodeChecks.${system}; };
+        lasr-dev = craneLib.devShell {
+          checks = { inherit (self.checks.${system}) lasrNodeBuild; };
+        };
         nix-dev = pkgs.mkShell {
           buildInputs = with pkgs; [
             nil
@@ -346,6 +354,7 @@
     }) // {
       nixosConfigurations.lasr_nightly = let
         system = flake-utils.lib.system.x86_64-linux;
+        nightly_pkgs = self.packages.${system};
       in
       nixpkgs.lib.nixosSystem {
         inherit system;
@@ -355,16 +364,19 @@
           ({ modulesPath, ... }: {
             imports = [ ./deployments/digital-ocean/digital-ocean-image.nix ];
 
-            # Adding the LASR package:
-            # Variant 1: Inject via Flake
-            environment.systemPackages = [
-              self.packages.${system}.lasr_node
+            # Adding the LASR packages:
+            environment.systemPackages = with nightly_pkgs; [
+              lasr_node
+              lasr_cli
             ];
-
-            # Variant 2: Inject via overlay
-            # TODO!
           })
         ];
+        specialArgs = {
+          lasr_pkgs = with nightly_pkgs; {
+            lasr_node = lasr_node;
+            lasr_cli = lasr_cli;
+          };
+        };
       };
     }; 
 }
