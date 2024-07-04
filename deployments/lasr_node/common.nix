@@ -241,6 +241,7 @@ in
         compute_rpc_url=ws://localhost:9125 
         storage_rpc_url=ws://localhost:9126
         batch_interval=180
+        ipfs_path="/app/tmp/kubo"
         echo "set -o noclobber" > ~/.bashrc
         echo "export SECRET_KEY=$secret_key" >> ~/.bashrc
         echo "export BLOCKS_PROCESSED_PATH=$block_path" >> ~/.bashrc
@@ -249,6 +250,7 @@ in
         echo "export COMPUTE_RPC_URL=$compute_rpc_url" >> ~/.bashrc
         echo "export STORAGE_RPC_URL=$storage_rpc_url" >> ~/.bashrc
         echo "export BATCH_INTERVAL=$batch_interval" >> ~/.bashrc
+        echo "export IPFS_PATH=$ipfs_path" >> ~/.bashrc
         echo "[[ \$- == *i* && -f \"\$HOME/.bashrc\" ]] && source \"\$HOME/.bashrc\"" > ~/.bash_profile
         echo "Successfully initialized lasr_node environment."
       '';
@@ -259,11 +261,13 @@ in
       preStart = ''
         if [ ! -e "/app/tmp/kubo" ]; then
           mkdir -p /app/tmp/kubo
+          cd /app/tmp/kubo
+          export IPFS_PATH=/app/tmp/kubo
+          "${pkgs.kubo}/bin/ipfs" init
+          echo "Initialized IPFS."
+        else
+          echo "IPFS already initialized."
         fi
-        cd /app/tmp/kubo
-        export IPFS_PATH=/app/tmp/kubo
-        "${pkgs.kubo}/bin/ipfs" init
-        echo "Initialized IPFS."
       '';
       script = ''
         sleep 2
