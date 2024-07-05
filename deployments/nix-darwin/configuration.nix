@@ -3,7 +3,7 @@
   # Packages that will be installed on your system.
   environment.systemPackages = with pkgs; [
     helix # or your favorite editor
-    nil   # nix lsp
+    nil # nix lsp
   ];
 
   # Auto upgrade nix package and the daemon service.

@@ -2,19 +2,20 @@
 let
   system = pkgs.stdenv.hostPlatform.system;
   # Pull the PD server image from dockerhub
-  pd-image = let
-    platformSha256 = {
-      "aarch64-linux" = "sha256-+IBB5p1M8g3fLjHbF90vSSAoKUidl5cdkpTulkzlMAc=";
-      "x86_64-linux" = "sha256-xNPJrv8y6vjAPNvn9lAkghCfRGUDiBfRCUBsEYvb49Q=";
-    }."${system}" or (builtins.throw "Unsupported platform, must either be arm64 or amd64 Linux: found ${system}");
-  in
-  pkgs.dockerTools.pullImage {
-    imageName = "pingcap/pd";
-    imageDigest = "sha256:0e87d077d0fd92903e26a6ebeda633d6979380aac6fc76aa24c6a02d25a404f6";
-    sha256 = platformSha256;
-    finalImageTag = "latest";
-    finalImageName = "pingcap/pd";
-  };
+  pd-image =
+    let
+      platformSha256 = {
+        "aarch64-linux" = "sha256-+IBB5p1M8g3fLjHbF90vSSAoKUidl5cdkpTulkzlMAc=";
+        "x86_64-linux" = "sha256-xNPJrv8y6vjAPNvn9lAkghCfRGUDiBfRCUBsEYvb49Q=";
+      }."${system}" or (builtins.throw "Unsupported platform, must either be arm64 or amd64 Linux: found ${system}");
+    in
+    pkgs.dockerTools.pullImage {
+      imageName = "pingcap/pd";
+      imageDigest = "sha256:0e87d077d0fd92903e26a6ebeda633d6979380aac6fc76aa24c6a02d25a404f6";
+      sha256 = platformSha256;
+      finalImageTag = "latest";
+      finalImageName = "pingcap/pd";
+    };
   # Starts the placement driver server for TiKV.
   # NOTE: This is a global script, which is run by default and is only
   # necessary in scenarios where the server does not start automatically.
@@ -28,19 +29,20 @@ let
         --advertise-peer-urls="http://0.0.0.0:2380"
   '';
   # Pull the TiKV server image from dockerhub
-  tikv-image = let
-    platformSha256 = {
-      "aarch64-linux" = "sha256-JbogHq9FLfm7x08xkwiDF0+YyUKRXF34vHty+ZxIZh0=";
-      "x86_64-linux" = "sha256-udLF3mAuUU08QX2Tg/mma9uu0JdtdJuxK3R1bqdKjKk=";
-    }.${system} or (builtins.throw "Unsupported platform, must either be arm64 or amd64 Linux: found ${system}");
-  in
-  pkgs.dockerTools.pullImage {
-    imageName = "pingcap/tikv";
-    imageDigest = "sha256:e68889611930cc054acae5a46bee862c4078af246313b414c1e6c4671dceca63";
-    sha256 = platformSha256;
-    finalImageTag = "latest";
-    finalImageName = "pingcap/tikv";
-  };
+  tikv-image =
+    let
+      platformSha256 = {
+        "aarch64-linux" = "sha256-JbogHq9FLfm7x08xkwiDF0+YyUKRXF34vHty+ZxIZh0=";
+        "x86_64-linux" = "sha256-udLF3mAuUU08QX2Tg/mma9uu0JdtdJuxK3R1bqdKjKk=";
+      }.${system} or (builtins.throw "Unsupported platform, must either be arm64 or amd64 Linux: found ${system}");
+    in
+    pkgs.dockerTools.pullImage {
+      imageName = "pingcap/tikv";
+      imageDigest = "sha256:e68889611930cc054acae5a46bee862c4078af246313b414c1e6c4671dceca63";
+      sha256 = platformSha256;
+      finalImageTag = "latest";
+      finalImageName = "pingcap/tikv";
+    };
   # Starts the TiKV server.
   # NOTE: This is a global script, which is run by default and is only
   # necessary in scenarios where the server does not start automatically.
