@@ -1,4 +1,4 @@
-{ pkgs, lasr_pkgs, ... }:
+{ pkgs, ... }:
 let
   system = pkgs.stdenv.hostPlatform.system;
   # Pull the PD server image from dockerhub
@@ -175,6 +175,8 @@ in
     kubo
     overmind
     tmux
+    lasr_node
+    lasr_cli
   ] ++ [
     init-env
     procfile
@@ -234,7 +236,7 @@ in
           exit 0
         fi
 
-        secret_key=$(${lasr_pkgs.lasr_cli}/bin/lasr_cli wallet new | ${pkgs.jq}/bin/jq '.secret_key')
+        secret_key=$(${pkgs.lasr_cli}/bin/lasr_cli wallet new | ${pkgs.jq}/bin/jq '.secret_key')
         block_path="/app/blocks_processed.dat"
         eth_rpc_url="https://u0anlnjcq5:xPYLI9OMwxRqJZqhfgEiKMeGdpVjGduGKmMCNBsu46Y@u0auvfalma-u0j1mdxq0w-rpc.us0-aws.kaleido.io/" 
         eo_contract=0x563f0efeea703237b32ae7f66123b864f3e46a3c
@@ -303,7 +305,7 @@ in
       '';
       script = ''
         source "$HOME/.bashrc"
-        "${lasr_pkgs.lasr_node}/bin/lasr_node"
+        "${pkgs.lasr_node}/bin/lasr_node"
       '';
       wantedBy = [ "default.target" ];
       serviceConfig = {

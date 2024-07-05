@@ -158,49 +158,20 @@
           modules = [
             ./deployments/lasr_node/common.nix
             ./deployments/lasr_node/nightly/nightly-options.nix
-            ({ modulesPath, pkgs, ... }: {
-              imports = [ (modulesPath + "/virtualisation/qemu-vm.nix") ];
-
-              virtualisation = {
-                cores = 3;
-                # The virtual machine's system architecture
-                # Ports are subject to change
-                forwardPorts = [
-                  { from = "host"; host.port = 2222; guest.port = 22; }
-                ];
-                # Disk size & RAM may be increased as needed
-                diskSize = 32768;
-                memorySize = 4096;
-                # The host's version of nixpkgs used to build the VM
-                host.pkgs = hostPkgs;
-              };
-
+            ./deployments/debug-vm.nix
+            ({ # macOS specific stuff
+              virtualisation.host.pkgs = hostPkgs;
               nixpkgs.hostPlatform = guest_system;
-
-              users.users.root.hashedPassword = "";
-
-              services.openssh = {
-                enable = true;
-                settings.PermitRootLogin = "yes";
-                settings.PermitEmptyPasswords = "yes";
-              };
-              security.pam.services.sshd.allowNullPassword = true;
-
-              # Adding the LASR packages:
-              environment.systemPackages = with guest_pkgs; [
-                lasr_node
-                lasr_cli
+            })
+            ({
+              nixpkgs.overlays = [ 
+                self.overlays.rust
+                self.overlays.lasr_overlay
+                # what we actually want:
+                #self.inputs.lasr.overlays.default
               ];
-
-              nix.settings.experimental-features = ["nix-command" "flakes"];
             })
           ];
-          specialArgs = {
-            lasr_pkgs = with guest_pkgs; {
-              lasr_node = lasr_node;
-              lasr_cli = lasr_cli;
-            };
-          };
         };
       in {
         versa = versaNodeDrv;
@@ -354,31 +325,36 @@
         };
       };
     }) // {
+      overlays = {
+        lasr_overlay = import ./deployments/lasr_node/lasr-overlay.nix;
+        rust = final: prev: {
+          # This contains a lot of policy decisions which rust toolchain is used
+          craneLib = (self.inputs.crane.mkLib prev).overrideToolchain final.rustToolchain.fenix-pkgs;
+          rustToolchain = prev.callPackage ./dev/rust-toolchain.nix { 
+            inherit (self.inputs) fenix versatus; 
+          };
+
+          # This wouldn't be necessary if the lasr overlay was defined in the lasr repo
+          lasrSrc = self.inputs.lasr;
+        };
+      };
+
       nixosConfigurations.lasr_nightly = let
         system = flake-utils.lib.system.x86_64-linux;
-        nightly_pkgs = self.packages.${system};
       in
       nixpkgs.lib.nixosSystem {
         inherit system;
         modules = [
           ./deployments/lasr_node/common.nix
           ./deployments/lasr_node/nightly/nightly-options.nix
-          ({ modulesPath, ... }: {
-            imports = [ ./deployments/digital-ocean/digital-ocean-image.nix ];
-
-            # Adding the LASR packages:
-            environment.systemPackages = with nightly_pkgs; [
-              lasr_node
-              lasr_cli
+          ./deployments/digital-ocean/digital-ocean-image.nix
+          ({
+            nixpkgs.overlays = [ 
+              self.overlays.rust
+              self.overlays.lasr_overlay
             ];
           })
         ];
-        specialArgs = {
-          lasr_pkgs = with nightly_pkgs; {
-            lasr_node = lasr_node;
-            lasr_cli = lasr_cli;
-          };
-        };
       };
     }; 
 }
