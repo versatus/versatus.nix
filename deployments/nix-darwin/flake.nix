@@ -15,13 +15,16 @@
       pkgs = nixpkgs.legacyPackages.${system}; # Packages inherent of your system.
       inherit (pkgs) lib;
 
+      # Your system's configuration, where packages
+      # can be installed, and options can be enabled.
+      # System options that result from the configuration
+      # can be found at `/etc/nix/nix.conf`. Packages
+      # are installed to the `nix-store` volume.
       configuration = import ./configuration.nix {
-        # Your system's configuration, where packages
-        inherit system pkgs lib; # can be installed, and options can be enabled.
-        rev = self.rev or self.dirtyRev or null; # System options that result from the configuration
-      }; # can be found at `/etc/nix/nix.conf`. Packages
+        inherit system pkgs lib;
+        rev = self.rev or self.dirtyRev or null;
+      };
     in
-    # are installed to the `nix-store` volume.
     {
       # Rebuild darwin flake using:
       # $ darwin-rebuild switch --flake .
