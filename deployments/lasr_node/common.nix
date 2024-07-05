@@ -69,6 +69,7 @@ let
     git clone https://github.com/versatus/lasr.git
 
     cd /app/bin
+    printf "${ipfs-config.text}" > "${ipfs-config.name}"
     printf "${start-ipfs.text}" > "${start-ipfs.name}"
     printf "${start-lasr.text}" > "${start-lasr.name}"
     printf "${start-overmind.text}" > "${start-overmind.name}"
@@ -115,6 +116,61 @@ let
     exit 0
   '';
 
+  ipfs-config = let
+    ipfs = "${pkgs.ipfs}/bin/ipfs";
+  in pkgs.writeTextFile {
+    name = "ipfs-config.sh";
+    text = ''
+      ## The shell in the go-ipfs container is busybox, so a version of ash
+      ## Shellcheck might warn on things POSIX sh cant do, but ash can
+      ## In Shellcheck, ash is an alias for dash, but busybox ash can do more than dash 
+      ## https://github.com/koalaman/shellcheck/blob/master/src/ShellCheck/Data.hs#L134
+      
+      ## Uncomment this section to customise the gateway configuration
+      # echo "ipfs-config: setting Gateway config"
+      # ipfs config --json Gateway '{
+      #         "HTTPHeaders": {
+      #             "Access-Control-Allow-Origin": [
+      #                 "*"
+      #             ],
+      #         }
+      #     }'
+      ## Obviously you should use your own domains here, but I thought it instructive to show path and 
+      ## subdomain gateways here with the widely known PL domains
+      
+      ## Disable hole punchibng
+      "${ipfs}" config --json Swarm.RelayClient.Enabled true
+      "${ipfs}" config --json Swarm.EnableHolePunching true
+      
+      ## Bind API to all interfaces so that fly proxy for the Kubo API works
+      "${ipfs}" config Addresses.API --json '["/ip4/0.0.0.0/tcp/5001", "/ip6/::/tcp/5001"]'
+      
+      ## Maybe you need to listen on IPv6 too? Some clouds use it for internal networking
+      "${ipfs}" config --json Addresses.Gateway '["/ip4/0.0.0.0/tcp/8080","/ip6/::/tcp/8080"]'
+      
+      ## In fly.io there's no way to know the public IPv4 so it has to be manually configured to be announced
+      ## Note that it must be 1-1, you can't point at multiple go-ipfs nodes and expect it to work
+      # echo "ipfs-config: setting Addresses.AppendAnnounce config"
+      # TODO: Enable this line with the IPv4 of the 
+      # ipfs config --json Addresses.AppendAnnounce '["/ip4/37.16.9.190/tcp/4001", "/ip4/37.16.9.190/tcp/4002/ws", "/dns4/versatus-lasr-ipfs.fly.dev/tcp/443/wss"]'
+      "${ipfs}" config --json Addresses.AppendAnnounce '["/ip4/167.99.20.121/tcp/4001", "/ip4/167.99.20.121/tcp/4002/ws", "/ip6/2a09:8280:1::1c:fb3f/tcp/4001", "/ip6/2a09:8280:1::1c:fb3f/tcp/4002/ws", "/dns4/versatus-lasr-ipfs.fly.dev/tcp/443/wss"]'
+      
+      #ipfs config --bool Swarm.Transports.Network.Websocket true
+      "${ipfs}" config Swarm.Transports.Network.Websocket --json true
+      "${ipfs}" config Swarm.Transports.Network.WebTransport --json true
+      
+      
+      "${ipfs}" config --json Addresses.Swarm '["/ip4/0.0.0.0/tcp/4001", "/ip4/0.0.0.0/tcp/4002/ws", "/ip4/0.0.0.0/udp/4003/quic/webtransport", "/ip6/::/tcp/4001", "/ip6/::/tcp/4002/ws", "/ip6/::/udp/4003/quic/webtransport", "/ip4/0.0.0.0/udp/4001/quic", "/ip6/::/udp/4001/quic"]'
+      
+      # ipfs config Bootstrap [] --json
+      "${ipfs}" config Swarm.ResourceMgr.Enabled --json true
+      
+      "${ipfs}" config --json API.HTTPHeaders.Access-Control-Allow-Origin '["http://167.99.20.121:5001", "http://127.0.0.1:5001", "https://webui.ipfs.io"]'
+      "${ipfs}" config --json API.HTTPHeaders.Access-Control-Allow-Methods '["PUT", "POST"]'
+    '';
+    executable = true;
+    destination = "/app/bin/ipfs-config.sh";
+  };
   # Starts kubo IPFS daemon.
   start-ipfs = pkgs.writeTextFile {
     name = "start-ipfs.sh";
@@ -177,6 +233,7 @@ in
     tmux
   ] ++ [
     init-env
+    ipfs-config
     procfile
     setup-working-dir
     start-ipfs
@@ -252,6 +309,8 @@ in
         echo "export BATCH_INTERVAL=$batch_interval" >> ~/.bashrc
         echo "export IPFS_PATH=$ipfs_path" >> ~/.bashrc
         echo "[[ \$- == *i* && -f \"\$HOME/.bashrc\" ]] && source \"\$HOME/.bashrc\"" > ~/.bash_profile
+        "${ipfs-config}/app/bin/ipfs-config.sh"
+
         echo "Successfully initialized lasr_node environment."
       '';
       wantedBy = [ "default.target" ];
