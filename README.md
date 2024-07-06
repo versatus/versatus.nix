@@ -10,11 +10,8 @@ Nix is a package manager with a focus on reproducibility and reliability.
 To get started, choose an installation type at https://nixos.org/download. MacOS users, please read on.
 
 **For MacOS users**, the graphical installer made available by Determinate Systems has some advantages and is recommended over the official installer, which are explained and can be found here: https://determinate.systems/posts/graphical-nix-installer.
-
 Additionally, MacOS users may want to enable the `nix-darwin` module features in order to run linux virtual machines locally, otherwise this step may be skipped.
-There are two resources we recommend for getting started with `nix-darwin` which should be followed in this order:
-1. [nix-darwin setup](https://nixcademy.com/2024/01/15/nix-on-macos/#step-2-going-declarative-with-nix-darwin) 
-2. [nix-darwin linux builder](https://nixcademy.com/2024/02/12/macos-linux-builder/#the-nix-darwin-option)
+The [deployment guide](./deployments/README.md#nixos-vm-darwin) has a detailed walkthrough with examples and trouble shooting for getting started with the `nix-darwin` `linux-builder` feature.
 
 ### Nixpkgs
 
