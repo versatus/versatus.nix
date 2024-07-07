@@ -24,9 +24,18 @@ Linux users have an easy time of this, and can simply `nix build .#<nixos-vm>`, 
 assuming they already have a nix installation.
 
 ### NixOS VM Darwin
-Darwin users worry not, there is a fairly straight-forward solution with `nix-darwin`. The setup for which is detailed in the root [README.md](../README.md).
+Darwin users worry not, there is a fairly straight-forward solution with `nix-darwin`.
+
+There are two resources we recommend for getting started with `nix-darwin` which should be followed in this order:
+1. [nix-darwin setup](https://nixcademy.com/2024/01/15/nix-on-macos/#step-2-going-declarative-with-nix-darwin) 
+2. [nix-darwin linux builder](https://nixcademy.com/2024/02/12/macos-linux-builder/#the-nix-darwin-option)
+
 An example of a finalized `nix-darwin` flake, which enables the `linux-builder` functionality can be found at [nix-darwin-example](./nix-darwin).
 From this point, the steps for running the virtual environment are [the same as Linux](#nixos-vm-linux)! 🎉
+```sh
+nix build .#<nixos-vm>
+./result/bin/<run-nixos-vm>
+```
 
 ## Rebuilding The NixOS Server
 **Be aware that changes to the server with these methods are semi-permanent at best. To add permanent changes please file
@@ -98,10 +107,13 @@ nixos-rebuild switch --flake .#<name-of-configuration>
 
 ## Troubleshooting
 
-### Unable To Connect After Server Rebuild
+### Unable To Connect After Server Or VM Rebuild
 After rebuilding the server with `nixos-rebuild`, or the server is rebuilt from a newer
 version of the NixOS image, you may encounter an error when attempting to connect to the
 server via SSH. Multiple attempts of this will prompt you with a warning of potential
 "man-in-the-middle" attacks. To reset your relationship with the server navigate to your
 `~/.ssh` folder, and remove the server's host keys from the `known_hosts` file. You should
 be able to now connect to the server, which will prompt you to add the new keys to `~/.ssh/known_hosts`. 
+The same can happen when developing on local NixOS VMs. The solution is the same, but in
+addition the `.qcow2` file that is produced after loading the image can be removed if
+system state does not need to be restored from the previous boot.
