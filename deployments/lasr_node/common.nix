@@ -306,7 +306,7 @@ in
         block_path="/app/blocks_processed.dat"
         eth_rpc_url="https://u0anlnjcq5:xPYLI9OMwxRqJZqhfgEiKMeGdpVjGduGKmMCNBsu46Y@u0auvfalma-u0j1mdxq0w-rpc.us0-aws.kaleido.io/" 
         eo_contract=0x563f0efeea703237b32ae7f66123b864f3e46a3c
-        compute_rpc_url=ws://localhost:9125 
+        compute_rpc_url=ws://localhost:9125
         storage_rpc_url=ws://localhost:9126
         batch_interval=180
         ipfs_path="/app/tmp/kubo"
@@ -354,6 +354,7 @@ in
         if [ ! -e "/app/bin" ]; then
           echo "Setting up working directory.."
           mkdir -p /app/bin
+          mkdir -p /app/payload
           mkdir -p /app/base_image/busybox
 
           cd /app
@@ -381,6 +382,7 @@ in
       '';
       script = ''
         source "$HOME/.bashrc"
+        cd /app
         "${pkgs.lasr_node}/bin/lasr_node"
       '';
       wantedBy = [ "default.target" ];
