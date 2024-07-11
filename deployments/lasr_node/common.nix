@@ -53,6 +53,20 @@ let
         --data-dir="/tikv" \
         --pd="http://127.0.0.1:2379"
   '';
+  busybox-image =
+    let
+      platformSha256 = {
+        "aarch64-linux" = "sha256-Oq9xmrdoAJvwQl9WOBkJFhacWHT9JG0B384gaHrimL8=";
+        "x86_64-linux" = "sha256-udLF3mAuUU08QX2Tg/mma9uu0JdtdJuxK3R1bqdKjKk=";
+      }.${system} or (builtins.throw "Unsupported platform, must either be arm64 or amd64 Linux: found ${system}");
+    in
+    pkgs.dockerTools.pullImage {
+      imageName = "busybox";
+      imageDigest = "sha256:50aa4698fa6262977cff89181b2664b99d8a56dbca847bf62f2ef04854597cf8";
+      sha256 = platformSha256;
+      finalImageTag = "latest";
+      finalImageName = "busybox";
+    };
 
   # Creates the working directory, scripts & initializes the IPFS node.
   # NOTE: This is a global script, which is run by default and is only
@@ -340,10 +354,16 @@ in
         if [ ! -e "/app/bin" ]; then
           echo "Setting up working directory.."
           mkdir -p /app/bin
+          mkdir -p /app/base_image/busybox
 
           cd /app
           printf "${procfile.text}" > "${procfile.name}"
-          "${pkgs.git}"/bin/git clone https://github.com/versatus/lasr.git
+          ${pkgs.git}/bin/git clone https://github.com/versatus/lasr.git
+
+          cd /app/base_image/busybox
+          mkdir --mode=0755 rootfs
+          # TODO: There is probably a better way to do this using `dockerTools.pullImage` -> `busybox-image`
+          ${pkgs.docker}/bin/docker export $(${pkgs.docker}/bin/docker create busybox) | /run/wrappers/bin/sudo /run/current-system/sw/bin/tar -xf - -C rootfs --same-owner --same-permissions
 
           cd /app/bin
           printf "${start-ipfs.text}" > "${start-ipfs.name}"
