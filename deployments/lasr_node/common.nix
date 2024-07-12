@@ -4,17 +4,18 @@ let
   # Pull the PD server image from dockerhub
   pd-image =
     let
+      name = "pingcap/pd";
       platformSha256 = {
         "aarch64-linux" = "sha256-+IBB5p1M8g3fLjHbF90vSSAoKUidl5cdkpTulkzlMAc=";
         "x86_64-linux" = "sha256-xNPJrv8y6vjAPNvn9lAkghCfRGUDiBfRCUBsEYvb49Q=";
-      }."${system}" or (builtins.throw "Unsupported platform, must either be arm64 or amd64 Linux: found ${system}");
+      }."${system}" or (builtins.throw "Unsupported platform for docker image ${name}, must either be arm64 or amd64 Linux: found ${system}");
     in
     pkgs.dockerTools.pullImage {
-      imageName = "pingcap/pd";
+      imageName = name;
       imageDigest = "sha256:0e87d077d0fd92903e26a6ebeda633d6979380aac6fc76aa24c6a02d25a404f6";
       sha256 = platformSha256;
       finalImageTag = "latest";
-      finalImageName = "pingcap/pd";
+      finalImageName = name;
     };
   # Starts the placement driver server for TiKV.
   # NOTE: This is a global script, which is run by default and is only
@@ -31,17 +32,18 @@ let
   # Pull the TiKV server image from dockerhub
   tikv-image =
     let
+      name = "pingcap/tikv";
       platformSha256 = {
         "aarch64-linux" = "sha256-JbogHq9FLfm7x08xkwiDF0+YyUKRXF34vHty+ZxIZh0=";
         "x86_64-linux" = "sha256-udLF3mAuUU08QX2Tg/mma9uu0JdtdJuxK3R1bqdKjKk=";
-      }.${system} or (builtins.throw "Unsupported platform, must either be arm64 or amd64 Linux: found ${system}");
+      }.${system} or (builtins.throw "Unsupported platform for docker image ${name}, must either be arm64 or amd64 Linux: found ${system}");
     in
     pkgs.dockerTools.pullImage {
-      imageName = "pingcap/tikv";
+      imageName = name;
       imageDigest = "sha256:e68889611930cc054acae5a46bee862c4078af246313b414c1e6c4671dceca63";
       sha256 = platformSha256;
       finalImageTag = "latest";
-      finalImageName = "pingcap/tikv";
+      finalImageName = name;
     };
   # Starts the TiKV server.
   # NOTE: This is a global script, which is run by default and is only
@@ -55,17 +57,18 @@ let
   '';
   busybox-image =
     let
+      name = "busybox";
       platformSha256 = {
         "aarch64-linux" = "sha256-Oq9xmrdoAJvwQl9WOBkJFhacWHT9JG0B384gaHrimL8=";
-        "x86_64-linux" = "sha256-udLF3mAuUU08QX2Tg/mma9uu0JdtdJuxK3R1bqdKjKk=";
-      }.${system} or (builtins.throw "Unsupported platform, must either be arm64 or amd64 Linux: found ${system}");
+        "x86_64-linux" = "sha256-Oq9xmrdoAJvwQl9WOBkJFhacWHT9JG0B384gaHrimL8=";
+      }.${system} or (builtins.throw "Unsupported platform for docker image ${name}, must either be arm64 or amd64 Linux: found ${system}");
     in
     pkgs.dockerTools.pullImage {
-      imageName = "busybox";
+      imageName = name;
       imageDigest = "sha256:50aa4698fa6262977cff89181b2664b99d8a56dbca847bf62f2ef04854597cf8";
       sha256 = platformSha256;
       finalImageTag = "latest";
-      finalImageName = "busybox";
+      finalImageName = name;
     };
 
   # Creates the working directory, scripts & initializes the IPFS node.
@@ -350,37 +353,52 @@ in
     node-start = {
       description = "Start the lasr_node process.";
       after = [ "init-env.service" "ipfs-start.service" ];
-      preStart = ''
-        if [ ! -e "/app/bin" ]; then
-          echo "Setting up working directory.."
-          mkdir -p /app/bin
-          mkdir -p /app/payload
-          mkdir -p /app/base_image/busybox
+      preStart =
+        let
+          # nix-store paths are resolved on user login, but here we have to give the absolute paths.
+          docker = "${pkgs.docker}/bin/docker";
+          sudo = "/run/wrappers/bin/sudo";
+          tar = "/run/current-system/sw/bin/tar";
+        in
+        ''
+          if [ ! -e "/app/bin" ]; then
+            echo "Setting up working directory.."
+            mkdir -p /app/bin
+            mkdir -p /app/payload
+            mkdir -p /app/base_image/busybox
 
-          cd /app
-          printf "${procfile.text}" > "${procfile.name}"
-          ${pkgs.git}/bin/git clone https://github.com/versatus/lasr.git
+            cd /app
+            printf "${procfile.text}" > "${procfile.name}"
+            ${pkgs.git}/bin/git clone https://github.com/versatus/lasr.git
 
-          cd /app/base_image/busybox
-          mkdir --mode=0755 rootfs
-          # TODO: There is probably a better way to do this using `dockerTools.pullImage` -> `busybox-image`
-          ${pkgs.docker}/bin/docker export $(${pkgs.docker}/bin/docker create busybox) | /run/wrappers/bin/sudo /run/current-system/sw/bin/tar -xf - -C rootfs --same-owner --same-permissions
+            cd /app/base_image/busybox
+            mkdir --mode=0755 rootfs
+            # TODO: There is probably a better way to do this using `dockerTools.pullImage` -> `busybox-image`
+            ${docker} export $(${docker} create busybox) | ${sudo} ${tar} -xf - -C rootfs --same-owner --same-permissions
 
-          cd /app/bin
-          printf "${start-ipfs.text}" > "${start-ipfs.name}"
-          printf "${start-lasr.text}" > "${start-lasr.name}"
-          printf "${start-overmind.text}" > "${start-overmind.name}"
+            cd /app/bin
+            printf "${start-ipfs.text}" > "${start-ipfs.name}"
+            printf "${start-lasr.text}" > "${start-lasr.name}"
+            printf "${start-overmind.text}" > "${start-overmind.name}"
 
-          for file in ./*; do
-            chmod +x "$file"
-          done
+            for file in ./*; do
+              chmod +x "$file"
+            done
 
-          echo "Working directory '/app' is ready."
-        else
-          echo "Working directory already exists."
-        fi
-      '';
+            # wait for busybox to set up the root filesystem for the program env
+            while [ ! -e "/app/base_image/busybox/rootfs/bin" ]; do
+              sleep 2
+            done
+
+            echo "Working directory '/app' is ready."
+          else
+            echo "Working directory already exists."
+          fi
+        '';
       script = ''
+        # grace period for all services to finish setup
+        sleep 5
+
         source "$HOME/.bashrc"
         cd /app
         "${pkgs.lasr_node}/bin/lasr_node"
