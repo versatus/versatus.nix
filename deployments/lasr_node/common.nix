@@ -55,20 +55,27 @@ let
         --data-dir="/tikv" \
         --pd="http://127.0.0.1:2379"
   '';
-  busybox-image =
+  busybox-stream =
     let
       name = "busybox";
+      tag = "latest";
       platformSha256 = {
         "aarch64-linux" = "sha256-Oq9xmrdoAJvwQl9WOBkJFhacWHT9JG0B384gaHrimL8=";
         "x86_64-linux" = "sha256-Oq9xmrdoAJvwQl9WOBkJFhacWHT9JG0B384gaHrimL8=";
       }.${system} or (builtins.throw "Unsupported platform for docker image ${name}, must either be arm64 or amd64 Linux: found ${system}");
+      busyboxImage = pkgs.dockerTools.pullImage {
+        imageName = name;
+        imageDigest = "sha256:50aa4698fa6262977cff89181b2664b99d8a56dbca847bf62f2ef04854597cf8";
+        sha256 = platformSha256;
+        finalImageTag = tag;
+        finalImageName = name;
+      };
     in
-    pkgs.dockerTools.pullImage {
-      imageName = name;
-      imageDigest = "sha256:50aa4698fa6262977cff89181b2664b99d8a56dbca847bf62f2ef04854597cf8";
-      sha256 = platformSha256;
-      finalImageTag = "latest";
-      finalImageName = name;
+    pkgs.dockerTools.streamLayeredImage {
+      name = name;
+      tag = tag;
+      fromImage = busyboxImage;
+      config.Cmd = [ "busybox" ];
     };
 
   # Creates the working directory, scripts & initializes the IPFS node.
@@ -373,7 +380,7 @@ in
 
             cd /app/base_image/busybox
             mkdir --mode=0755 rootfs
-            # TODO: There is probably a better way to do this using `dockerTools.pullImage` -> `busybox-image`
+            ${busybox-stream} | ${docker} image load
             ${docker} export $(${docker} create busybox) | ${sudo} ${tar} -xf - -C rootfs --same-owner --same-permissions
 
             cd /app/bin
@@ -387,6 +394,7 @@ in
 
             # wait for busybox to set up the root filesystem for the program env
             while [ ! -e "/app/base_image/busybox/rootfs/bin" ]; do
+              echo "Waiting for busybox filesystem to be ready, sleeping for 2s..."
               sleep 2
             done
 
