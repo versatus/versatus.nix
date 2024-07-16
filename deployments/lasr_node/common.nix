@@ -93,6 +93,8 @@ let
     cd /app
     printf "${procfile.text}" > "${procfile.name}"
     git clone https://github.com/versatus/lasr.git
+    git clone https://github.com/Layr-Labs/eigenda.git
+
 
     cd /app/bin
     printf "${ipfs-config.text}" > "${ipfs-config.name}"
@@ -363,6 +365,7 @@ in
       preStart =
         let
           # nix-store paths are resolved on user login, but here we have to give the absolute paths.
+          git = "${pkgs.git}/bin/git";
           docker = "${pkgs.docker}/bin/docker";
           sudo = "/run/wrappers/bin/sudo";
           tar = "/run/current-system/sw/bin/tar";
@@ -376,7 +379,8 @@ in
 
             cd /app
             printf "${procfile.text}" > "${procfile.name}"
-            ${pkgs.git}/bin/git clone https://github.com/versatus/lasr.git
+            ${git} clone https://github.com/versatus/lasr.git
+            ${git} clone https://github.com/Layr-Labs/eigenda.git
 
             cd /app/base_image/busybox
             mkdir --mode=0755 rootfs
