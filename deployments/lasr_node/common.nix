@@ -93,8 +93,6 @@ let
     cd /app
     printf "${procfile.text}" > "${procfile.name}"
     git clone https://github.com/versatus/lasr.git
-    git clone https://github.com/Layr-Labs/eigenda.git
-
 
     cd /app/bin
     printf "${ipfs-config.text}" > "${ipfs-config.name}"
@@ -380,7 +378,6 @@ in
             cd /app
             printf "${procfile.text}" > "${procfile.name}"
             ${git} clone https://github.com/versatus/lasr.git
-            ${git} clone https://github.com/Layr-Labs/eigenda.git
 
             cd /app/base_image/busybox
             mkdir --mode=0755 rootfs
