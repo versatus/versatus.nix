@@ -127,6 +127,8 @@ let
     compute_rpc_url=ws://localhost:9125 
     storage_rpc_url=ws://localhost:9126
     batch_interval=180
+    ipfs_path="/app/tmp/kubo"
+    runsc_bin_path="${pkgs.gvisor}/bin/runsc"
     echo "set -o noclobber" > ~/.bashrc
     echo "export SECRET_KEY=$secret_key" >> ~/.bashrc
     echo "export BLOCKS_PROCESSED_PATH=$block_path" >> ~/.bashrc
@@ -135,6 +137,8 @@ let
     echo "export COMPUTE_RPC_URL=$compute_rpc_url" >> ~/.bashrc
     echo "export STORAGE_RPC_URL=$storage_rpc_url" >> ~/.bashrc
     echo "export BATCH_INTERVAL=$batch_interval" >> ~/.bashrc
+    echo "export IPFS_PATH=$ipfs_path" >> ~/.bashrc
+    echo "export RUNSC_BIN_PATH=$runsc_bin_path" >> ~/.bashrc
     echo "[[ \$- == *i* && -f \"\$HOME/.bashrc\" ]] && source \"\$HOME/.bashrc\"" > ~/.bash_profile
 
     source ~/.bashrc
@@ -320,6 +324,7 @@ in
         storage_rpc_url=ws://localhost:9126
         batch_interval=180
         ipfs_path="/app/tmp/kubo"
+        runsc_bin_path="${pkgs.gvisor}/bin/runsc"
         echo "set -o noclobber" > ~/.bashrc
         echo "export SECRET_KEY=$secret_key" >> ~/.bashrc
         echo "export BLOCKS_PROCESSED_PATH=$block_path" >> ~/.bashrc
@@ -329,6 +334,7 @@ in
         echo "export STORAGE_RPC_URL=$storage_rpc_url" >> ~/.bashrc
         echo "export BATCH_INTERVAL=$batch_interval" >> ~/.bashrc
         echo "export IPFS_PATH=$ipfs_path" >> ~/.bashrc
+        echo "export RUNSC_BIN_PATH=$runsc_bin_path" >> ~/.bashrc
         echo "[[ \$- == *i* && -f \"\$HOME/.bashrc\" ]] && source \"\$HOME/.bashrc\"" > ~/.bash_profile
         echo "Successfully initialized lasr_node environment."
       '';
