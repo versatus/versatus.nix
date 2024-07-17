@@ -7,11 +7,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1720546058,
-        "narHash": "sha256-iU2yVaPIZm5vMGdlT0+57vdB/aPq/V5oZFBRwYw+HBM=",
+        "lastModified": 1721058578,
+        "narHash": "sha256-fs/PVa3H5dS1//4BjecWi3nitXm5fRObx0JxXIAo+JA=",
         "owner": "ipetkov",
         "repo": "crane",
-        "rev": "2d83156f23c43598cf44e152c33a59d3892f8b29",
+        "rev": "17e5109bb1d9fb393d70fba80988f7d70d1ded1a",
         "type": "github"
       },
       "original": {
@@ -28,11 +28,11 @@
         "rust-analyzer-src": []
       },
       "locked": {
-        "lastModified": 1720679322,
-        "narHash": "sha256-6ffU/E1I9lwDoOcaXmDLf3HEwC2aab1BGh2JQVXgwYE=",
+        "lastModified": 1721197688,
+        "narHash": "sha256-l8kQ9lKRKxnA/SLRfdkfoBhIZ+Joa0/DQCsWFGK0pE8=",
         "owner": "nix-community",
         "repo": "fenix",
-        "rev": "87536ab1ef7378c982cbe3455e3c0d48f1879bc5",
+        "rev": "8ce088d85623fba191de915ab46133697125913b",
         "type": "github"
       },
       "original": {
@@ -62,11 +62,11 @@
     "lasr": {
       "flake": false,
       "locked": {
-        "lastModified": 1720502609,
-        "narHash": "sha256-umP3YuQs0gDSXqOEbeH0KwgDq4v9UHNJI4XOcePj6sQ=",
+        "lastModified": 1721243454,
+        "narHash": "sha256-7O7E4hA2JqtgJrpeX08uzROhQfIx1q4OzVG4gwLVfsw=",
         "owner": "versatus",
         "repo": "lasr",
-        "rev": "91e710b9e01aa65650c0a69aa31afd291fd75448",
+        "rev": "20b8d48e531de2cd2f55bc902ff9f225c837bcbe",
         "type": "github"
       },
       "original": {
@@ -77,11 +77,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1720657034,
-        "narHash": "sha256-nPhbeFdyN8yn+EXmnPcBWisoypndtQbNIhSKmAinv3E=",
+        "lastModified": 1721116560,
+        "narHash": "sha256-++TYlGMAJM1Q+0nMVaWBSEvEUjRs7ZGiNQOpqbQApCU=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "212defe037698e18fc9521dfe451779a8979844c",
+        "rev": "9355fa86e6f27422963132c2c9aeedb0fb963d93",
         "type": "github"
       },
       "original": {
