@@ -62,11 +62,11 @@
     "lasr": {
       "flake": false,
       "locked": {
-        "lastModified": 1721243454,
-        "narHash": "sha256-7O7E4hA2JqtgJrpeX08uzROhQfIx1q4OzVG4gwLVfsw=",
+        "lastModified": 1721277825,
+        "narHash": "sha256-syVnc/0nr0v2OQ1iaUtNu2CIRfqd0MAxTZ1n6hqh1aQ=",
         "owner": "versatus",
         "repo": "lasr",
-        "rev": "20b8d48e531de2cd2f55bc902ff9f225c837bcbe",
+        "rev": "8bcf36e611f8a1cd294965e74f4c08ce9d7a5195",
         "type": "github"
       },
       "original": {
