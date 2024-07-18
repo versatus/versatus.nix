@@ -44,8 +44,8 @@
           inherit (pkgs) lib;
 
           # Language toolchains
-          rustToolchain = pkgs.callPackage ./dev/rust-toolchain.nix { inherit fenix versatus; };
-          haskellToolchain = pkgs.callPackage ./dev/haskell-toolchain.nix pkgs;
+          rustToolchain = pkgs.callPackage ./toolchains/rust-toolchain.nix { inherit fenix versatus; };
+          haskellToolchain = pkgs.callPackage ./toolchains/haskell-toolchain.nix pkgs;
 
           # Overrides the default crane rust-toolchain with fenix.
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain.fenix-pkgs;
@@ -332,7 +332,7 @@
         rust = final: prev: {
           # This contains a lot of policy decisions which rust toolchain is used
           craneLib = (self.inputs.crane.mkLib prev).overrideToolchain final.rustToolchain.fenix-pkgs;
-          rustToolchain = prev.callPackage ./dev/rust-toolchain.nix {
+          rustToolchain = prev.callPackage ./toolchains/rust-toolchain.nix {
             inherit (self.inputs) fenix versatus;
           };
 
