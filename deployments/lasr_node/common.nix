@@ -129,6 +129,7 @@ let
     batch_interval=180
     ipfs_path="/app/tmp/kubo"
     runsc_bin_path="${pkgs.gvisor}/bin/runsc"
+    grpcurl_bin_path="${pkgs.grpcurl}/bin/grpcurl"
     echo "set -o noclobber" > ~/.bashrc
     echo "export SECRET_KEY=$secret_key" >> ~/.bashrc
     echo "export BLOCKS_PROCESSED_PATH=$block_path" >> ~/.bashrc
@@ -139,6 +140,7 @@ let
     echo "export BATCH_INTERVAL=$batch_interval" >> ~/.bashrc
     echo "export IPFS_PATH=$ipfs_path" >> ~/.bashrc
     echo "export RUNSC_BIN_PATH=$runsc_bin_path" >> ~/.bashrc
+    echo "export GRPCURL_BIN_PATH=$grpcurl_bin_path" >> ~/.bashrc
     echo "[[ \$- == *i* && -f \"\$HOME/.bashrc\" ]] && source \"\$HOME/.bashrc\"" > ~/.bash_profile
 
     source ~/.bashrc
@@ -325,7 +327,7 @@ in
         batch_interval=180
         ipfs_path="/app/tmp/kubo"
         runsc_bin_path="${pkgs.gvisor}/bin/runsc"
-        grpcurl="${pkgs.grpcurl}/bin/grpcurl"
+        grpcurl_bin_path="${pkgs.grpcurl}/bin/grpcurl"
         echo "set -o noclobber" > ~/.bashrc
         echo "export SECRET_KEY=$secret_key" >> ~/.bashrc
         echo "export BLOCKS_PROCESSED_PATH=$block_path" >> ~/.bashrc
@@ -336,7 +338,7 @@ in
         echo "export BATCH_INTERVAL=$batch_interval" >> ~/.bashrc
         echo "export IPFS_PATH=$ipfs_path" >> ~/.bashrc
         echo "export RUNSC_BIN_PATH=$runsc_bin_path" >> ~/.bashrc
-        echo "alias grpcurl='$grpcurl'" >> ~/.bashrc
+        echo "export GRPCURL_BIN_PATH=$grpcurl_bin_path" >> ~/.bashrc
         echo "[[ \$- == *i* && -f \"\$HOME/.bashrc\" ]] && source \"\$HOME/.bashrc\"" > ~/.bash_profile
         echo "Successfully initialized lasr_node environment."
       '';
