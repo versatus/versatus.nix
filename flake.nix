@@ -372,7 +372,7 @@
 
       templates = {
         rust-package = {
-          path = ./templates/rust-package.nix;
+          path = ./templates/rust-package;
           description = ''
             Initializes a nix flake that includes the boilerplate code for building
             and developing Versatus' rust-based single-package projects. A workspace
@@ -382,7 +382,7 @@
           '';
         };
         rust-workspace = {
-          path = ./templates/rust-workspace.nix;
+          path = ./templates/rust-workspace;
           description = ''
             Initializes a nix flake that includes the boilerplate code for building
             and developing Versatus' rust-based workspace projects. A single-package
@@ -393,7 +393,7 @@
           '';
         };
         rust-workspace-hakari = {
-          path = ./templates/rust-workspace-hakari.nix;
+          path = ./templates/rust-workspace-hakari;
           description = ''
             Initializes a nix flake that includes the boilerplate code for building
             and developing Versatus' rust-based workspace projects. A single-package
