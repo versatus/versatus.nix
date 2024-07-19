@@ -19,12 +19,6 @@
 
     flake-utils.url = "github:numtide/flake-utils";
 
-    # TODO: enable checks
-    # advisory-db = {
-    #   url = "github:rustsec/advisory-db";
-    #   flake = false;
-    # };
-
     versatus = {
       url = "github:versatus/versatus";
       flake = false;
@@ -44,7 +38,22 @@
           inherit (pkgs) lib;
 
           # Language toolchains
-          rustToolchain = pkgs.callPackage ./toolchains/rust-toolchain.nix { inherit fenix versatus; };
+          #
+          # Given the path to a `rust-toolchain.toml`, produces the derivation
+          # for that toolchain for linux and darwin systems.
+          # Useful for rust projects that declare a `rust-toolchain.toml`.
+          mkRustToolchainFromTOML = toml_path: hash:
+            import ./toolchains/rust-toolchain.nix {
+              inherit
+                lib
+                pkgs
+                fenix
+                system
+                toml_path
+                hash;
+            };
+          rustToolchain = mkRustToolchainFromTOML (versatus + "/rust-toolchain.toml")
+            "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
           haskellToolchain = pkgs.callPackage ./toolchains/haskell-toolchain.nix pkgs;
 
           # Overrides the default crane rust-toolchain with fenix.
@@ -156,9 +165,9 @@
               lasrGuestVM = nixpkgs.lib.nixosSystem {
                 system = null;
                 modules = [
-                  ./deployments/lasr_node/common.nix
-                  ./deployments/lasr_node/nightly/nightly-options.nix
-                  ./deployments/debug-vm.nix
+                  ./nixos/modules/deployments/lasr_node/common.nix
+                  ./nixos/modules/deployments/lasr_node/nightly/nightly-options.nix
+                  self.nixosModules.deployments.debugVm
                   ({
                     # macOS specific stuff
                     virtualisation.host.pkgs = hostPkgs;
@@ -285,6 +294,15 @@
           #   default = versaNodeBin;
           # };
 
+          # Handles building project specific toolchains.
+          toolchains = {
+            # Given the path to a `rust-toolchain.toml`, produces the derivation
+            # for that toolchain for linux and darwin systems.
+            # Useful for rust projects that declare a `rust-toolchain.toml`.
+            inherit mkRustToolchainFromTOML;
+          };
+
+
           devShells = rec {
             default = nix-dev;
             # Developer environments for Versatus repos
@@ -328,16 +346,63 @@
           };
         }) // {
       overlays = {
-        lasr_overlay = import ./deployments/lasr_node/lasr-overlay.nix;
+        lasr_overlay = import ./nixos/modules/deployments/lasr_node/lasr-overlay.nix;
         rust = final: prev: {
           # This contains a lot of policy decisions which rust toolchain is used
           craneLib = (self.inputs.crane.mkLib prev).overrideToolchain final.rustToolchain.fenix-pkgs;
           rustToolchain = prev.callPackage ./toolchains/rust-toolchain.nix {
-            inherit (self.inputs) fenix versatus;
+            inherit (self.inputs) fenix; toml_path = (self.inputs.versatus + "/rust-toolchain.toml");
+            hash = "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
           };
 
           # This wouldn't be necessary if the lasr overlay was defined in the lasr repo
           lasrSrc = self.inputs.lasr;
+        };
+      };
+
+      nixosModules = {
+        deployments = {
+          debugVm = ./nixos/modules/deployments/debug-vm.nix;
+          digitalOcean = {
+            digitalOceanImage = ./nixos/modules/deployments/digital-ocean/digital-ocean-image.nix;
+            configuration = ./nixos/modules/deployments/digital-ocean/configuration.nix;
+          };
+        };
+      };
+
+      templates = {
+        rust-package = {
+          path = ./templates/rust-package.nix;
+          description = ''
+            Initializes a nix flake that includes the boilerplate code for building
+            and developing Versatus' rust-based single-package projects. A workspace
+            template is also available: `rust-workspace`.
+
+            `nix flake init -t github:versatus/versatus.nix#rust-package`
+          '';
+        };
+        rust-workspace = {
+          path = ./templates/rust-workspace.nix;
+          description = ''
+            Initializes a nix flake that includes the boilerplate code for building
+            and developing Versatus' rust-based workspace projects. A single-package
+            template is available: `rust-package`, as well as a workspace template
+            with extra workspace testing tools: `rust-workspace-hakari`.
+
+            `nix flake init -t github:versatus/versatus.nix#rust-workspace`
+          '';
+        };
+        rust-workspace-hakari = {
+          path = ./templates/rust-workspace-hakari.nix;
+          description = ''
+            Initializes a nix flake that includes the boilerplate code for building
+            and developing Versatus' rust-based workspace projects. A single-package
+            template is also available: `rust-package`. This template includes the
+            cargo-hakari workspace tooling, a version of this template without hakari
+            is also available: `rust-workspace`.
+
+            `nix flake init -t github:versatus/versatus.nix#rust-workspace-hakari`
+          '';
         };
       };
 
@@ -348,9 +413,9 @@
         nixpkgs.lib.nixosSystem {
           inherit system;
           modules = [
-            ./deployments/lasr_node/common.nix
-            ./deployments/lasr_node/nightly/nightly-options.nix
-            ./deployments/digital-ocean/digital-ocean-image.nix
+            ./nixos/modules/deployments/lasr_node/common.nix
+            ./nixos/modules/deployments/lasr_node/nightly/nightly-options.nix
+            self.nixosModules.deployments.digitalOcean.digitalOceanImage
             ({
               nixpkgs.overlays = [
                 self.overlays.rust
