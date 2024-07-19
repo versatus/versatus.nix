@@ -1,8 +1,8 @@
-{ lib, pkgs, fenix, system, versatus }:
+{ lib, pkgs, fenix, system, toml_path, hash }:
 let
   fenix-pkgs = (fenix.packages.${system}.fromToolchainFile {
-    file = versatus + "/rust-toolchain.toml";
-    sha256 = "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
+    file = toml_path;
+    sha256 = hash;
   });
   darwin-pkgs = (with pkgs; lib.optionals stdenv.isDarwin [
     # Additional darwin specific inputs
