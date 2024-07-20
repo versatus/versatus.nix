@@ -36,6 +36,7 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           inherit (pkgs) lib;
+          mkGuestSystem = { pkgs, ... }: builtins.replaceStrings [ "darwin" ] [ "linux" ] pkgs.stdenv.hostPlatform.system;
 
           # Language toolchains
           #
@@ -158,7 +159,7 @@
               hostPkgs = pkgs;
               # The linux virtual machine system architecture, derived from the host's environment
               # Example: aarch64-darwin -> aarch64-linux
-              guest_system = builtins.replaceStrings [ "darwin" ] [ "linux" ] pkgs.stdenv.hostPlatform.system;
+              guest_system = mkGuestSystem pkgs;
               # Build packages for the linux variant of the host architecture, but preserve the host's
               # version of nixpkgs to build the virtual machine with. This way, building and running a
               # linux virtual environment works for all supported system architectures.
@@ -294,12 +295,21 @@
           #   default = versaNodeBin;
           # };
 
-          # Handles building project specific toolchains.
-          toolchains = {
-            # Given the path to a `rust-toolchain.toml`, produces the derivation
-            # for that toolchain for linux and darwin systems.
-            # Useful for rust projects that declare a `rust-toolchain.toml`.
-            inherit mkRustToolchainFromTOML;
+          # TODO: Abstract this into modules and inherit lib
+          lib = {
+            # Tools for managing virtual machines.
+            virtualisation = {
+              # The linux virtual machine system architecture, derived from the host's environment.
+              # Example: aarch64-darwin -> aarch64-linux
+              inherit mkGuestSystem;
+            };
+            # Tools for creating project specific toolchains.
+            toolchains = {
+              # Given the path to a `rust-toolchain.toml`, produces the derivation
+              # for that toolchain for linux and darwin systems.
+              # Useful for rust projects that declare a `rust-toolchain.toml`.
+              inherit mkRustToolchainFromTOML;
+            };
           };
 
 
