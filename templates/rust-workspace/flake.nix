@@ -41,6 +41,7 @@
         rustToolchain = toolchains.mkRustToolchainFromTOML
           ./rust-toolchain.toml
           lib.fakeSha256;
+
         # Overrides the default crane rust-toolchain with fenix.
         craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain.fenix-pkgs;
         src = craneLib.cleanCargoSource ./.;
@@ -77,7 +78,7 @@
         individualCrateArgs = commonArgs // {
           inherit cargoArtifacts;
           inherit (craneLib.crateNameFromCargoToml { inherit src; }) version;
-          doCheck = false; # Use cargo-nexttest below.
+          doCheck = false; # Use cargo-nextest below.
         };
 
         fileSetForCrate = crate: lib.fileset.toSource {
@@ -85,6 +86,8 @@
           fileset = lib.fileset.unions [
             ./Cargo.toml
             ./Cargo.lock
+            ./my-common
+            ./my-workspace-hack
             crate
           ];
         };
@@ -147,6 +150,24 @@
             partitions = 1;
             partitionType = "count";
           });
+
+          # Ensure that cargo-hakari is up to date
+          my-workspace-hakari = craneLib.mkCargoDerivation {
+            inherit src;
+            pname = "my-workspace-hakari";
+            cargoArtifacts = null;
+            doInstallCargoArtifacts = false;
+
+            buildPhaseCargoCommand = ''
+              cargo hakari generate --diff  # workspace-hack Cargo.toml is up-to-date
+              cargo hakari manage-deps --dry-run  # all workspace crates depend on workspace-hack
+              cargo hakari verify
+            '';
+
+            nativeBuildInputs = [
+              pkgs.cargo-hakari
+            ];
+          };
         };
 
         packages = {
@@ -164,7 +185,7 @@
           my-server = flake-utils.lib.mkApp {
             drv = my-server;
           };
-        };  
+        };
 
         devShells.default = craneLib.devShell {
           # Inherit inputs from checks.
@@ -174,7 +195,14 @@
           # MY_CUSTOM_DEVELOPMENT_VAR = "something else";
 
           # Extra inputs can be added here; cargo and rustc are provided by default.
+          #
+          # In addition, these packages and the `rustToolchain` are inherited from checks above:
+          # cargo-audit
+          # cargo-deny
+          # cargo-nextest
+          # cargo-hakari
           packages = with pkgs; [
+            # ripgrep
             nil # nix lsp
             nixpkgs-fmt # nix formatter
           ];

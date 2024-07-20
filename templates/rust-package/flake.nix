@@ -149,6 +149,11 @@
           # MY_CUSTOM_DEVELOPMENT_VAR = "something else";
 
           # Extra inputs can be added here; cargo and rustc are provided by default.
+          #
+          # In addition, these packages and the `rustToolchain` are inherited from checks above:
+          # cargo-audit
+          # cargo-deny
+          # cargo-nextest
           packages = with pkgs; [
             # ripgrep
             nil # nix lsp
