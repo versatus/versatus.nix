@@ -37,10 +37,10 @@
         inherit (pkgs) lib;
 
         toolchains = versatus-nix.toolchains.${system};
-
         rustToolchain = toolchains.mkRustToolchainFromTOML
           ./rust-toolchain.toml
-          lib.fakeSha256;
+          lib.fakeSha256; # Run `nix flake check` and replace with the expected hash.
+
         # Overrides the default crane rust-toolchain with fenix.
         craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain.fenix-pkgs;
         src = craneLib.cleanCargoSource ./.;
@@ -74,75 +74,55 @@
         # Build *just* the cargo dependencies, so we can reuse
         # all of that work (e.g. via cachix) when running in CI
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-        individualCrateArgs = commonArgs // {
+
+        # Build the actual crate itself, reusing the dependency
+        # artifacts from above.
+        my-crate = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
-          inherit (craneLib.crateNameFromCargoToml { inherit src; }) version;
           doCheck = false; # Use cargo-nexttest below.
-        };
-
-        fileSetForCrate = crate: lib.fileset.toSource {
-          root = ./.;
-          fileset = lib.fileset.unions [
-            ./Cargo.toml
-            ./Cargo.lock
-            crate
-          ];
-        };
-
-        # Build the top-level crates of the workspace as individual derivations.
-        # This allows consumers to only depend on (and build) only what they need.
-        # Though it is possible to build the entire workspace as a single derivation,
-        # so this is left up to you on how to organize things
-        my-cli = craneLib.buildPackage (individualCrateArgs // {
-          pname = "my-cli";
-          cargoExtraArgs = "-p my-cli"; # specify the package to build
-          src = fileSetForCrate ./my-cli;
-        });
-        my-server = craneLib.buildPackage (individualCrateArgs // {
-          pname = "my-server";
-          cargoExtraArgs = "-p my-server"; # specify the package to build
-          src = fileSetForCrate ./my-server;
+          # Extra command line arguments to pass to cargo.
+          # cargoExtraArgs = "--locked --bin your_binary_name";
         });
       in
       {
         checks = {
           # Build the crate as part of `nix flake check` for convenience
-          inherit my-cli my-server;
+          inherit my-crate;
 
-          # Run clippy (and deny all warnings) on the workspace source,
+          # Run clippy (and deny all warnings) on the crate source,
           # again, reusing the dependency artifacts from above.
           #
           # Note that this is done as a separate derivation so that
           # we can block the CI if there are issues here, but not
           # prevent downstream consumers from building our crate by itself.
-          my-workspace-clippy = craneLib.cargoClippy (commonArgs // {
+          my-crate-clippy = craneLib.cargoClippy (commonArgs // {
             inherit cargoArtifacts;
             cargoClippyExtraArgs = "--all-targets -- --deny warnings";
           });
 
-          my-workspace-doc = craneLib.cargoDoc (commonArgs // {
+          my-crate-doc = craneLib.cargoDoc (commonArgs // {
             inherit cargoArtifacts;
           });
 
           # Check formatting
-          my-workspace-fmt = craneLib.cargoFmt {
+          my-crate-fmt = craneLib.cargoFmt {
             inherit src;
           };
 
           # Audit dependencies
-          my-workspace-audit = craneLib.cargoAudit {
+          my-crate-audit = craneLib.cargoAudit {
             inherit src advisory-db;
           };
 
           # Audit licenses
-          my-workspace-deny = craneLib.cargoDeny {
+          my-crate-deny = craneLib.cargoDeny {
             inherit src;
           };
 
           # Run tests with cargo-nextest
-          # Consider setting `doCheck = false` on other crate derivations
-          # if you do not want the tests to run twice
-          my-workspace-nextest = craneLib.cargoNextest (commonArgs // {
+          # Consider setting `doCheck = false` on `my-crate` if you do not want
+          # the tests to run twice
+          my-crate-nextest = craneLib.cargoNextest (commonArgs // {
             inherit cargoArtifacts;
             partitions = 1;
             partitionType = "count";
@@ -150,21 +130,16 @@
         };
 
         packages = {
-          inherit my-cli my-server;
+          default = my-crate;
         } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-          my-workspace-llvm-coverage = craneLib.cargoLlvmCov (commonArgs // {
+          my-crate-llvm-coverage = craneLib.cargoLlvmCov (commonArgs // {
             inherit cargoArtifacts;
           });
         };
 
-        apps = {
-          my-cli = flake-utils.lib.mkApp {
-            drv = my-cli;
-          };
-          my-server = flake-utils.lib.mkApp {
-            drv = my-server;
-          };
-        };  
+        apps.default = flake-utils.lib.mkApp {
+          drv = my-crate;
+        };
 
         devShells.default = craneLib.devShell {
           # Inherit inputs from checks.
@@ -174,7 +149,13 @@
           # MY_CUSTOM_DEVELOPMENT_VAR = "something else";
 
           # Extra inputs can be added here; cargo and rustc are provided by default.
+          #
+          # In addition, these packages and the `rustToolchain` are inherited from checks above:
+          # cargo-audit
+          # cargo-deny
+          # cargo-nextest
           packages = with pkgs; [
+            # ripgrep
             nil # nix lsp
             nixpkgs-fmt # nix formatter
           ];
