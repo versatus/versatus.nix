@@ -36,11 +36,10 @@
         pkgs = nixpkgs.legacyPackages.${system};
         inherit (pkgs) lib;
 
-        toolchains = versatus-nix.toolchains.${system};
-
-        rustToolchain = toolchains.mkRustToolchainFromTOML
+        versaLib = versatus-nix.lib.${system};
+        rustToolchain = versaLib.toolchains.mkRustToolchainFromTOML
           ./rust-toolchain.toml
-          lib.fakeSha256;
+          lib.fakeSha256; # Run `nix flake check` and replace with the expected hash.
 
         # Overrides the default crane rust-toolchain with fenix.
         craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain.fenix-pkgs;
