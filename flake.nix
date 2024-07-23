@@ -66,6 +66,8 @@
               nixpkgs-fmt
             ];
           };
+
+          formatter = pkgs.nixpkgs-fmt;
         }
       ) // {
       nixosModules = {
