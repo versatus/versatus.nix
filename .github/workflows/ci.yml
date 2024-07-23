@@ -1,4 +1,4 @@
-name: flake checks
+name: Nix Flake Checks
 on:
   pull_request:
     branches:
@@ -11,7 +11,7 @@ permissions: read-all
 
 jobs:
   flake-health-check:
-    name: Nix flake health check
+    name: nix flake check
     runs-on: ubuntu-latest
     permissions:
       id-token: "write"
@@ -24,7 +24,7 @@ jobs:
       - run: nix flake check
 
   flake-devShell-check:
-    name: Nix flake devShell check
+    name: nix develop
     runs-on: ubuntu-latest
     permissions:
       id-token: "write"
@@ -36,7 +36,7 @@ jobs:
       - run: nix develop
 
   flake-fmt-check:
-    name: Nix flake format check
+    name: nix fmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
