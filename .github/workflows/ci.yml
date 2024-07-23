@@ -1,4 +1,4 @@
-name: Pull Request
+name: Nix Flake Checks
 on:
   pull_request:
     branches:
@@ -10,8 +10,8 @@ concurrency:
 permissions: read-all
 
 jobs:
-  flake-health-checks:
-    name: Nix flake health checks
+  flake-health-check:
+    name: nix flake check
     runs-on: ubuntu-latest
     permissions:
       id-token: "write"
@@ -21,60 +21,25 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
-      # check the flake can be built
       - run: nix flake check
-      # build flake packages
-      - run: nix build .#versa
-      - run: nix build .#lasr_node
 
-  check-flake-devShells:
-    name: Nix flake devShell checks
+  flake-devShell-check:
+    name: nix develop
     runs-on: ubuntu-latest
     permissions:
       id-token: "write"
       contents: "read"
     steps:
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: true
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      # build development shells
-      - run: nix develop .#protocol-dev
-      - run: nix develop .#lasr-dev
-      - run: nix develop .#versa-rs
-      - run: nix develop .#versa-hs
+      - run: nix develop
 
-  check-digitalocean-images:
-    name: Build NixOS DigitalOcean images
+  flake-fmt-check:
+    name: nix fmt
     runs-on: ubuntu-latest
-    permissions:
-      id-token: "write"
-      contents: "read"
     steps:
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: true
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix build .#lasr_nightly_image -L
-
-  check-vm-images:
-    name: Build NixOS VM images
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: "write"
-      contents: "read"
-    steps:
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: true
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix build .#lasr_vm -L
+      - run: nix fmt --accept-flake-config -- --check .

@@ -1,25 +1,5 @@
 {
   "nodes": {
-    "crane": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1721322122,
-        "narHash": "sha256-a0G1NvyXGzdwgu6e1HQpmK5R5yLsfxeBe07nNDyYd+g=",
-        "owner": "ipetkov",
-        "repo": "crane",
-        "rev": "8a68b987c476a33e90f203f0927614a75c3f47ea",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ipetkov",
-        "repo": "crane",
-        "type": "github"
-      }
-    },
     "fenix": {
       "inputs": {
         "nixpkgs": [
@@ -59,22 +39,6 @@
         "type": "github"
       }
     },
-    "lasr": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1721333030,
-        "narHash": "sha256-9ZOIw3JE8wPWo5+apNe0ks/iMBxTFYZ8bWBimsm8NTc=",
-        "owner": "versatus",
-        "repo": "lasr",
-        "rev": "8be70184898dc0278fcd098992dd6aee6fb71c2d",
-        "type": "github"
-      },
-      "original": {
-        "owner": "versatus",
-        "repo": "lasr",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1721303309,
@@ -93,12 +57,9 @@
     },
     "root": {
       "inputs": {
-        "crane": "crane",
         "fenix": "fenix",
         "flake-utils": "flake-utils",
-        "lasr": "lasr",
-        "nixpkgs": "nixpkgs",
-        "versatus": "versatus"
+        "nixpkgs": "nixpkgs"
       }
     },
     "systems": {
@@ -113,22 +74,6 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
-        "type": "github"
-      }
-    },
-    "versatus": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1717000637,
-        "narHash": "sha256-oCKOYZPSGT+Hbp/IoyzeEzPwBkogkYIJA+Eu8IXhGMY=",
-        "owner": "versatus",
-        "repo": "versatus",
-        "rev": "217a0e73fa9284286e1482d50c2af260ada4f51c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "versatus",
-        "repo": "versatus",
         "type": "github"
       }
     }
