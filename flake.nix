@@ -81,7 +81,7 @@
       };
 
       overlays = {
-        fenix = inputs.fenix.overlays.default;
+        fenix = fenix.overlays.default;
         rust-toolchain = import ./overlays/rust-toolchain.nix;
       };
 
