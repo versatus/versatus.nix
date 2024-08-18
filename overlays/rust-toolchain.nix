@@ -12,7 +12,7 @@ let
       darwin.apple_sdk.frameworks.SystemConfiguration
     ]);
     complete = [ fenix-pkgs darwin-pkgs ];
-  }
+  };
 in
 {
   lib = prev.lib // {
