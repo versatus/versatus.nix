@@ -80,6 +80,11 @@
         };
       };
 
+      overlays = {
+        fenix = inputs.fenix.overlays.default;
+        rust-toolchain = import ./overlays/rust-toolchain.nix;
+      };
+
       templates = {
         rust-package = {
           path = ./templates/rust-package;
