@@ -13,9 +13,15 @@
     };
 
     flake-utils.url = "github:numtide/flake-utils";
+
+    nix-watch = {
+      url = "github:Cloud-Scythe-Labs/nix-watch";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
   };
 
-  outputs = { self, nixpkgs, fenix, flake-utils, ... }:
+  outputs = { self, nixpkgs, fenix, flake-utils, nix-watch, ... }:
     flake-utils.lib.eachDefaultSystem
       (system:
         let
@@ -57,6 +63,10 @@
                 # Takes nixpkgs as input, provides common haskell tools and automatically
                 # resolves paths. Includes LD_LIBRARY_PATH environment variable.
                 mkHaskellToolchain;
+            };
+            # Developer Tools
+            devTools = {
+              nix-watch = nix-watch.nix-watch.${system}.devTools;
             };
           };
 
