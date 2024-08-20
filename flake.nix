@@ -74,7 +74,7 @@
             buildInputs = with pkgs; [
               nil
               nixpkgs-fmt
-            ];
+            ] ++ self.lib.${system}.devTools.nix-watch;
           };
 
           formatter = pkgs.nixpkgs-fmt;
