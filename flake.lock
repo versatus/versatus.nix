@@ -39,6 +39,29 @@
         "type": "github"
       }
     },
+    "nix-watch": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1723875386,
+        "narHash": "sha256-4Wfogzc/snMB2BzNqFNMu/vKP2FjvJh4XZGem8aOaro=",
+        "owner": "Cloud-Scythe-Labs",
+        "repo": "nix-watch",
+        "rev": "22ecf25c968053363fc63d82f4311f0d6f6d0417",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Cloud-Scythe-Labs",
+        "repo": "nix-watch",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1721303309,
@@ -59,6 +82,7 @@
       "inputs": {
         "fenix": "fenix",
         "flake-utils": "flake-utils",
+        "nix-watch": "nix-watch",
         "nixpkgs": "nixpkgs"
       }
     },
